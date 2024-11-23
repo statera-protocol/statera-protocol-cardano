@@ -1,3 +1,5 @@
 **/*.addr
 **/*.sk
 .env
+dist
+node_modules
