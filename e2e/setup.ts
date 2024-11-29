@@ -9,7 +9,7 @@ import {
 import { builtinByteString, UTxO } from "@meshsdk/common";
 import dotenv from "dotenv";
 dotenv.config();
-import blueprint from "../../onchain/plutus.json" with { type: "json" };
+import blueprint from "./dist/onchain/plutus.json" with { type: "json" };
 
 // Setup blockhain provider as Maestro
 // const maestroKey = process.env.MAESTRO_KEY;
@@ -21,7 +21,7 @@ import blueprint from "../../onchain/plutus.json" with { type: "json" };
 //     apiKey: maestroKey,
 // });
 
-// Setup blockhain provider as Maestro
+// Setup blockhain provider as Blockfrost
 const blockfrostId = process.env.BLOCKFROST_ID;
 if (!blockfrostId) {
     throw new Error("BLOCKFROST_ID does not exist");
@@ -70,7 +70,6 @@ const scriptAddr = serializePlutusScript(
     undefined,
     0
 ).address;
-console.log('script address:', scriptAddr, '\n');
 
 // Create transaction builder
 const txBuilder = new MeshTxBuilder({
@@ -81,6 +80,7 @@ const txBuilder = new MeshTxBuilder({
 txBuilder.setNetwork('preprod');
 
 export {
+    blueprint,
     blockchainProvider,
     txBuilder,
     parameterizedScript,

@@ -8,6 +8,7 @@
 
 
 
+
 ## Off Chain
 - First transaction:
   - User approves a utxo from his wallet
@@ -16,7 +17,6 @@
   - Minting and sending of NFT position and requested loan to the user
 
 - Second tx flow:
-
 
 
 

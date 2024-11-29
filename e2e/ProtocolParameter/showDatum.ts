@@ -1,5 +1,5 @@
 import { BuiltinByteString, ConStr0, deserializeDatum, Integer, List } from "@meshsdk/core";
-import { blockchainProvider, scriptAddr } from "./setup.js";
+import { blockchainProvider, scriptAddr } from "../setup.js";
 
 const lockedUTxosWithDatum = await blockchainProvider.fetchAddressUTxOs(scriptAddr);
 console.log(lockedUTxosWithDatum, '\n');
