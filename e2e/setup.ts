@@ -9,7 +9,7 @@ import {
 import { builtinByteString, UTxO } from "@meshsdk/common";
 import dotenv from "dotenv";
 dotenv.config();
-import blueprint from "./dist/onchain/plutus.json" with { type: "json" };
+import blueprint from "../onchain/plutus.json" with { type: "json" };
 
 // Setup blockhain provider as Maestro
 // const maestroKey = process.env.MAESTRO_KEY;
