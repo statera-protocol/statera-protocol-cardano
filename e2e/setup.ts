@@ -2,11 +2,9 @@ import {
     BlockfrostProvider,
     MeshTxBuilder,
     MeshWallet,
-    applyParamsToScript,
     deserializeAddress,
-    serializePlutusScript,
 } from "@meshsdk/core";
-import { builtinByteString, UTxO } from "@meshsdk/common";
+import { UTxO } from "@meshsdk/common";
 import dotenv from "dotenv";
 dotenv.config();
 import blueprint from "../onchain/plutus.json" with { type: "json" };
@@ -53,24 +51,6 @@ if (!wallet1Collateral) {
 
 const { pubKeyHash: wallet1VK } = deserializeAddress(wallet1Address);
 
-// Protocol Parameter Validator
-const ProtocolParameterValidator = blueprint.validators.filter((val) => val.title.includes('protocol_parameter.spend'));
-if (!ProtocolParameterValidator) {
-    throw new Error('Protocol Parameter Validator not found!');
-}
-
-const parameterizedScript = applyParamsToScript(
-    ProtocolParameterValidator[0].compiledCode,
-    [builtinByteString(wallet1VK)],
-    "JSON"
-);
-
-const scriptAddr = serializePlutusScript(
-    { code: parameterizedScript, version: 'V3' },
-    undefined,
-    0
-).address;
-
 // Create transaction builder
 const txBuilder = new MeshTxBuilder({
     fetcher: blockchainProvider,
@@ -83,8 +63,6 @@ export {
     blueprint,
     blockchainProvider,
     txBuilder,
-    parameterizedScript,
-    scriptAddr,
     wallet1,
     wallet1Address,
     wallet1VK,

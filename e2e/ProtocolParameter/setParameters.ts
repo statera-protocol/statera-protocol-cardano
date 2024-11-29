@@ -1,5 +1,6 @@
 import { mConStr0 } from "@meshsdk/common";
-import { txBuilder, scriptAddr, wallet1Address, wallet1Utxos, wallet1 } from "../setup.js";
+import { txBuilder, wallet1Address, wallet1Utxos, wallet1 } from "../setup.js";
+import { scriptAddr } from "./validator.js";
 
 const ProtocolParametersDatum = mConStr0([
     15000,

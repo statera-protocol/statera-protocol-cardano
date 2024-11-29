@@ -1,5 +1,6 @@
 import { mConStr0 } from "@meshsdk/core";
-import { blockchainProvider, txBuilder, scriptAddr, parameterizedScript, wallet1Address, wallet1Collateral, wallet1VK, wallet1Utxos, wallet1 } from "../setup.js";
+import { blockchainProvider, txBuilder, wallet1Address, wallet1Collateral, wallet1VK, wallet1Utxos, wallet1 } from "../setup.js";
+import { parameterizedScript, scriptAddr } from "./validator.js";
 
 const lockedUTxosWithDatum = await blockchainProvider.fetchAddressUTxOs(scriptAddr);
 console.log(lockedUTxosWithDatum);
