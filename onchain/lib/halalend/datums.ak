@@ -1,7 +1,7 @@
 use aiken/crypto.{ScriptHash}
 use cardano/assets.{AssetName, PolicyId}
 
-pub type ProtocolParameterDatum {
+pub type ProtocolParametersDatum {
   min_collateral_ratio: Int,
   min_loan_amount: Int,
   protocol_usage_fee: Int,

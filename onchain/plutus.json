@@ -12,6 +12,94 @@
   },
   "validators": [
     {
+      "title": "collateral_nft.collateral_nft.mint",
+      "redeemer": {
+        "title": "redeemer",
+        "schema": {
+          "$ref": "#/definitions/collateral_nft~1Action"
+        }
+      },
+      "parameters": [
+        {
+          "title": "borrow_utxo",
+          "schema": {
+            "$ref": "#/definitions/cardano~1transaction~1OutputReference"
+          }
+        },
+        {
+          "title": "collateral_validator_hash",
+          "schema": {
+            "$ref": "#/definitions/ScriptHash"
+          }
+        }
+      ],
+      "compiledCode": "59036c01010032323232323232223225333005323232323253323300b3001300c3754004264646464a66601e600a0022a66602460226ea801c0085854ccc03cc00c00454ccc048c044dd50038010b0b18079baa00613232323232533301230083013375401429444c8c8c8c94ccc058c030c05cdd5000899299980b99b8748010c060dd5000899299980c1807180c9baa00113232323232323232323232325333027302a0021323232533302a302d002132323232533302b3370e6eb4c0b401520011533302b002100114a02940cc00806894ccc0accdd799ba548008cc0bcdd480925eb80c060c0b4dd5180c18169baa00113370e6660086eacc064c0b4dd50008080070060a503300101a23370e6660066eacc060c0b0dd5180c18161baa00100f00d00b22323300100100322533302f00114a026644a66605c600a00429444cc010010004c0c4004c0c8004888c94ccc0acc07cc0b0dd50008a400026eb4c0c0c0b4dd5000992999815980f98161baa00114c0103d87a80001323300100137566062605c6ea8008894ccc0c0004530103d87a80001323332225333031337220100062a66606266e3c02000c4c074cc0d4dd400125eb80530103d87a8000133006006001375c605e0026eb4c0c0004c0d0008c0c8004cc01800c00858c0ac004c94ccc098c068c09cdd50008a5eb7bdb1804dd5981598141baa0013300101400422323300100100322533302b00114c103d87a8000132333222533302c3372200e0062a66605866e3c01c00c4c060cc0c0dd300125eb80530103d87a8000133006006001375c60540026eacc0ac004c0bc008c0b400458dd6981400098140011bae30260013026002375a604800260480046eb8c088004c088008dd7181000098100011bae301e001301a37540022c603860326ea800458c06cc070c070c060dd51802180c1baa301b301837540022c646600200200e44a666034002298103d87a80001332253330193375e66e9520023301d375202c97ae03006301b3754600c60366ea8c01cc06cdd5001098029980e80125eb804cc010010004c070004c074004dd2a4000460320024603060320026eacc058c05cc05c00cdd6180a8011bac301400230143014001300f375400c6e1d2002375c6020601a6ea8008dc3a40002c601c601e006601a00460180046018002600e6ea800452613656375c002ae6955ceaab9e5573eae815d0aba201",
+      "hash": "ee3efd77b7ac446c53b255d50b8062287402c3b1bc690075ebf51d8f"
+    },
+    {
+      "title": "collateral_nft.collateral_nft.else",
+      "redeemer": {
+        "schema": {}
+      },
+      "parameters": [
+        {
+          "title": "borrow_utxo",
+          "schema": {
+            "$ref": "#/definitions/cardano~1transaction~1OutputReference"
+          }
+        },
+        {
+          "title": "collateral_validator_hash",
+          "schema": {
+            "$ref": "#/definitions/ScriptHash"
+          }
+        }
+      ],
+      "compiledCode": "59036c01010032323232323232223225333005323232323253323300b3001300c3754004264646464a66601e600a0022a66602460226ea801c0085854ccc03cc00c00454ccc048c044dd50038010b0b18079baa00613232323232533301230083013375401429444c8c8c8c94ccc058c030c05cdd5000899299980b99b8748010c060dd5000899299980c1807180c9baa00113232323232323232323232325333027302a0021323232533302a302d002132323232533302b3370e6eb4c0b401520011533302b002100114a02940cc00806894ccc0accdd799ba548008cc0bcdd480925eb80c060c0b4dd5180c18169baa00113370e6660086eacc064c0b4dd50008080070060a503300101a23370e6660066eacc060c0b0dd5180c18161baa00100f00d00b22323300100100322533302f00114a026644a66605c600a00429444cc010010004c0c4004c0c8004888c94ccc0acc07cc0b0dd50008a400026eb4c0c0c0b4dd5000992999815980f98161baa00114c0103d87a80001323300100137566062605c6ea8008894ccc0c0004530103d87a80001323332225333031337220100062a66606266e3c02000c4c074cc0d4dd400125eb80530103d87a8000133006006001375c605e0026eb4c0c0004c0d0008c0c8004cc01800c00858c0ac004c94ccc098c068c09cdd50008a5eb7bdb1804dd5981598141baa0013300101400422323300100100322533302b00114c103d87a8000132333222533302c3372200e0062a66605866e3c01c00c4c060cc0c0dd300125eb80530103d87a8000133006006001375c60540026eacc0ac004c0bc008c0b400458dd6981400098140011bae30260013026002375a604800260480046eb8c088004c088008dd7181000098100011bae301e001301a37540022c603860326ea800458c06cc070c070c060dd51802180c1baa301b301837540022c646600200200e44a666034002298103d87a80001332253330193375e66e9520023301d375202c97ae03006301b3754600c60366ea8c01cc06cdd5001098029980e80125eb804cc010010004c070004c074004dd2a4000460320024603060320026eacc058c05cc05c00cdd6180a8011bac301400230143014001300f375400c6e1d2002375c6020601a6ea8008dc3a40002c601c601e006601a00460180046018002600e6ea800452613656375c002ae6955ceaab9e5573eae815d0aba201",
+      "hash": "ee3efd77b7ac446c53b255d50b8062287402c3b1bc690075ebf51d8f"
+    },
+    {
+      "title": "collateral_validator.collateral_validator.spend",
+      "datum": {
+        "title": "datum",
+        "schema": {
+          "$ref": "#/definitions/halalend~1datums~1CollateralDatum"
+        }
+      },
+      "redeemer": {
+        "title": "redeemer",
+        "schema": {
+          "$ref": "#/definitions/collateral_validator~1Action"
+        }
+      },
+      "parameters": [
+        {
+          "title": "admin",
+          "schema": {
+            "$ref": "#/definitions/VerificationKeyHash"
+          }
+        }
+      ],
+      "compiledCode": "5901e60101003232323232323223225333004323232323253323300a3001300b37540042646644646464a66602060060022a66602660246ea80240085854ccc040c01c00454ccc04cc048dd50048010b0b18081baa00813232323232533301330063014375400e2646464a66602c6012602e6ea803c4c8c94ccc06cc0780084cdc39bad301a0014800458c070004c94ccc05cc038c060dd50008a5eb7bdb1804dd5980e180c9baa001323300100100722533301b00114c0103d87a8000132333222533301c337220100062a66603866e3c02000c4cdd2a4000660406e980092f5c02980103d87a8000133006006001375c60340026eacc06c004c07c008c07400454ccc058c8c94ccc060c03cc064dd5000899b89003375a603a60346ea80045281800980c9baa30013019375400c460380022646600200200a44a66603600229404cc894ccc068cdc780100c0a51133004004001375c603a002603c0022940dd6980d180d8011bae30190013019301930193019301537546030602a6ea801c58dd6180b980c001980b0011bab30150023015301530150013014301430143014301037540106e1d2000301000130103011001300c37540046e1d200216300d300e003300c002300b002300b0013006375400229309b2b1bae0015734aae7555cf2ab9f5740ae855d11",
+      "hash": "2c091cfbd36cb99fd013217b950f4918626707f86c88f59bc12e606c"
+    },
+    {
+      "title": "collateral_validator.collateral_validator.else",
+      "redeemer": {
+        "schema": {}
+      },
+      "parameters": [
+        {
+          "title": "admin",
+          "schema": {
+            "$ref": "#/definitions/VerificationKeyHash"
+          }
+        }
+      ],
+      "compiledCode": "5901e60101003232323232323223225333004323232323253323300a3001300b37540042646644646464a66602060060022a66602660246ea80240085854ccc040c01c00454ccc04cc048dd50048010b0b18081baa00813232323232533301330063014375400e2646464a66602c6012602e6ea803c4c8c94ccc06cc0780084cdc39bad301a0014800458c070004c94ccc05cc038c060dd50008a5eb7bdb1804dd5980e180c9baa001323300100100722533301b00114c0103d87a8000132333222533301c337220100062a66603866e3c02000c4cdd2a4000660406e980092f5c02980103d87a8000133006006001375c60340026eacc06c004c07c008c07400454ccc058c8c94ccc060c03cc064dd5000899b89003375a603a60346ea80045281800980c9baa30013019375400c460380022646600200200a44a66603600229404cc894ccc068cdc780100c0a51133004004001375c603a002603c0022940dd6980d180d8011bae30190013019301930193019301537546030602a6ea801c58dd6180b980c001980b0011bab30150023015301530150013014301430143014301037540106e1d2000301000130103011001300c37540046e1d200216300d300e003300c002300b002300b0013006375400229309b2b1bae0015734aae7555cf2ab9f5740ae855d11",
+      "hash": "2c091cfbd36cb99fd013217b950f4918626707f86c88f59bc12e606c"
+    },
+    {
       "title": "liquidity_pool.liquidity_pool.spend",
       "datum": {
         "title": "_d",
@@ -95,6 +183,10 @@
     }
   ],
   "definitions": {
+    "AssetName": {
+      "title": "AssetName",
+      "dataType": "bytes"
+    },
     "ByteArray": {
       "dataType": "bytes"
     },
@@ -111,9 +203,108 @@
         "$ref": "#/definitions/ByteArray"
       }
     },
+    "PolicyId": {
+      "title": "PolicyId",
+      "dataType": "bytes"
+    },
+    "ScriptHash": {
+      "title": "ScriptHash",
+      "dataType": "bytes"
+    },
     "VerificationKeyHash": {
       "title": "VerificationKeyHash",
       "dataType": "bytes"
+    },
+    "cardano/transaction/OutputReference": {
+      "title": "OutputReference",
+      "description": "An `OutputReference` is a unique reference to an output on-chain. The `output_index`\n corresponds to the position in the output list of the transaction (identified by its id)\n that produced that output",
+      "anyOf": [
+        {
+          "title": "OutputReference",
+          "dataType": "constructor",
+          "index": 0,
+          "fields": [
+            {
+              "title": "transaction_id",
+              "$ref": "#/definitions/ByteArray"
+            },
+            {
+              "title": "output_index",
+              "$ref": "#/definitions/Int"
+            }
+          ]
+        }
+      ]
+    },
+    "collateral_nft/Action": {
+      "title": "Action",
+      "anyOf": [
+        {
+          "title": "Mint",
+          "dataType": "constructor",
+          "index": 0,
+          "fields": []
+        },
+        {
+          "title": "Burn",
+          "dataType": "constructor",
+          "index": 1,
+          "fields": []
+        }
+      ]
+    },
+    "collateral_validator/Action": {
+      "title": "Action",
+      "anyOf": [
+        {
+          "title": "Refund",
+          "dataType": "constructor",
+          "index": 0,
+          "fields": []
+        },
+        {
+          "title": "Liquidate",
+          "dataType": "constructor",
+          "index": 1,
+          "fields": []
+        }
+      ]
+    },
+    "halalend/datums/CollateralDatum": {
+      "title": "CollateralDatum",
+      "anyOf": [
+        {
+          "title": "CollateralDatum",
+          "dataType": "constructor",
+          "index": 0,
+          "fields": [
+            {
+              "title": "tusd_pool_hash",
+              "$ref": "#/definitions/ScriptHash"
+            },
+            {
+              "title": "tusd_policy_id",
+              "$ref": "#/definitions/PolicyId"
+            },
+            {
+              "title": "tusd_asset_name",
+              "$ref": "#/definitions/AssetName"
+            },
+            {
+              "title": "tusd_borrowed",
+              "$ref": "#/definitions/Int"
+            },
+            {
+              "title": "collateral_nft_pid",
+              "$ref": "#/definitions/PolicyId"
+            },
+            {
+              "title": "loan_term",
+              "$ref": "#/definitions/Int"
+            }
+          ]
+        }
+      ]
     },
     "halalend/datums/ProtocolParameterDatum": {
       "title": "ProtocolParameterDatum",

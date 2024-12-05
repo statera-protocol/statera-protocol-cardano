@@ -1,6 +1,7 @@
 use aiken/collection/list
-use aiken/crypto.{VerificationKeyHash}
+use aiken/crypto.{ScriptHash, VerificationKeyHash}
 use aiken/interval.{Finite}
+use cardano/address.{Script}
 use cardano/transaction.{Input, OutputReference, ValidityRange}
 
 // validate that the transaction is signed by 'signer'
@@ -22,4 +23,18 @@ pub fn is_loan_term_end(range: ValidityRange, loan_term: Int) {
     Finite(time_now) -> loan_term <= time_now
     _ -> False
   }
+}
+
+pub fn calculate_100_percent_borrow_input_value(
+  given_value: Int,
+  given_percentage: Int,
+) {
+  given_value / given_percentage * 100
+}
+
+pub fn find_input_by_script_hash(inputs: List<Input>, script_hash: ScriptHash) {
+  list.find(
+    inputs,
+    fn(input) { input.output.address.payment_credential == Script(script_hash) },
+  )
 }
