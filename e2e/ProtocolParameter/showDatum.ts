@@ -2,12 +2,14 @@ import { BuiltinByteString, ConStr0, deserializeDatum, Integer, List } from "@me
 import { blockchainProvider } from "../setup.js";
 import { scriptAddr } from "./validator.js";
 
-const lockedUTxosWithDatum = await blockchainProvider.fetchAddressUTxOs(scriptAddr);
-console.log(lockedUTxosWithDatum, '\n');
-const lockedUTxoWithDatum = lockedUTxosWithDatum[0];
+console.log('protocol paramters address', scriptAddr);
+
+const protocolParameterUtxos = await blockchainProvider.fetchAddressUTxOs(scriptAddr);
+console.log(protocolParameterUtxos, '\n');
+const protocolParameterUtxo = protocolParameterUtxos[0];
 
 // throw error for an invalid utxo
-if (!lockedUTxoWithDatum) {
+if (!protocolParameterUtxo) {
     throw new Error("No utxos to unlock");
 }
 
@@ -23,11 +25,11 @@ type ProtocolParametersDatum = ConStr0<
 >;
 
 // check for a datum in the utxo
-if (!lockedUTxoWithDatum.output.plutusData) {
+if (!protocolParameterUtxo.output.plutusData) {
     throw new Error("No datum containing protocol parameters in utxo");
 }
 
-const datum = deserializeDatum<ProtocolParametersDatum>(lockedUTxoWithDatum.output.plutusData);
+const datum = deserializeDatum<ProtocolParametersDatum>(protocolParameterUtxo.output.plutusData);
 
 console.log('Protocol Parameters Datum:', datum, '\n');
 
@@ -37,9 +39,9 @@ datum.fields[3].list.forEach(asset => collateralAssets.push(Buffer.from(asset.by
 console.log(`
     Protocol Parameters Reconstructed keeping in mind that all ints (excluding loan term) were multiplied by 10_000
     Protocol parameters:
-        min_collateral_ratio: ${Number(datum.fields[0].int) / 10000},
-        min_loan_amount: ${Number(datum.fields[1].int) / 10000},
-        protocol_usage_fee: ${Number(datum.fields[2].int) / 10000},
+        min_collateral_ratio: ${Number(datum.fields[0].int)}%,
+        min_loan_amount: ${Number(datum.fields[1].int)},
+        protocol_usage_fee: ${Number(datum.fields[2].int)},
         collateral_assets: ${collateralAssets.join(", ")},
         loan_term: ${datum.fields[4].int} milli seconds,
 `);

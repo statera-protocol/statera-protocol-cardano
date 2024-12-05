@@ -3,9 +3,9 @@ import { txBuilder, wallet1Address, wallet1Utxos, wallet1 } from "../setup.js";
 import { scriptAddr } from "./validator.js";
 
 const ProtocolParametersDatum = mConStr0([
-    15000,
-    1000000,
-    50000,
+    150,
+    100,
+    5,
     ["ada", "iUSD", "halalend", "hosky"],
     14 * 24 * 60 * 60 * 1000,
 ]);
