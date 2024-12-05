@@ -1,1 +1,2 @@
 - Change the liquidity_pool validator to use the utility function `signed_by` instead
+- Protocol usage fee and collateral assets of protocol parameters are not currently used in the protocol

@@ -6,6 +6,7 @@
 - The NFT Minting validator validates the `borrow utxo`, calculates the rate using the `oracle dex ref input` and `protocol parameters ref input`, and approve if loan is allowed to be borrowed while minting an NFT as borrower's loan position (with a unique policy ID).
 - When the NFT Minting validation is successful, the amount that the user requested to borrow is sent to the borrower's address using the `Lending protocol validator` signed by the admin.
 
+- validate when spending from the liquidity pool during borrow that the requested funds is going to the borrower's address
 
 
 
