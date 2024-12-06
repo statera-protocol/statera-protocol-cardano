@@ -2,14 +2,12 @@ use aiken/collection/dict
 use aiken/collection/list
 use aiken/crypto.{ScriptHash}
 use cardano/address.{Script}
-use cardano/assets.{PolicyId, Value, lovelace_of, quantity_of, tokens}
+use cardano/assets.{PolicyId, Value, lovelace_of, quantity_of}
 use cardano/transaction.{
   InlineDatum, Input, Output, OutputReference, Transaction, find_input,
 }
 use halalend/datums.{CollateralDatum, ProtocolParametersDatum}
-use halalend/utils.{
-  calculate_100_percent_borrow_input_value, find_input_by_script_hash,
-}
+use halalend/utils.{calculate_by_percentage, find_input_by_script_hash}
 
 pub type Action {
   Mint
@@ -22,12 +20,14 @@ validator collateral_nft(
   protocol_parameters_hash: ScriptHash,
   oracle_hash: ScriptHash,
 ) {
-  mint(redeemer: Action, _pid: PolicyId, self: Transaction) {
+  mint(redeemer: Action, policy_id: PolicyId, self: Transaction) {
     let Transaction { inputs, outputs, mint, reference_inputs, .. } = self
 
     when redeemer is {
       Mint ->
         validate_mint_borrow_nft(
+          mint,
+          policy_id,
           inputs,
           collateral_validator_hash,
           protocol_parameters_hash,
@@ -52,6 +52,8 @@ validator collateral_nft(
 }
 
 fn validate_mint_borrow_nft(
+  mint: Value,
+  policy_id: PolicyId,
   inputs: List<Input>,
   collateral_validator_hash: ScriptHash,
   protocol_parameters_hash: ScriptHash,
@@ -60,18 +62,29 @@ fn validate_mint_borrow_nft(
   outputs: List<Output>,
   borrow_utxo: OutputReference,
 ) {
-  expect Some(collateral_input) =
-    find_input_by_script_hash(inputs, collateral_validator_hash)
+  expect Some(collateral_output) =
+    outputs
+      |> list.find(
+          fn(output) {
+            output.address.payment_credential == Script(
+              collateral_validator_hash,
+            )
+          },
+        )
 
-  expect InlineDatum(collateral_input_datum) = collateral_input.output.datum
+  expect InlineDatum(collateral_output_datum) = collateral_output.datum
 
   expect CollateralDatum {
     tusd_policy_id,
     tusd_asset_name,
     tusd_borrowed,
+    collateral_nft_pid,
+    collateral_asset,
     loan_term,
     ..
-  } = collateral_input_datum
+  } = collateral_output_datum
+
+  expect [Pair(_, quantity)] = mint |> assets.tokens(policy_id) |> dict.to_pairs
 
   expect Some(oracle_ref) =
     find_input_by_script_hash(reference_inputs, oracle_hash)
@@ -104,6 +117,10 @@ fn validate_mint_borrow_nft(
 
   let is_tsud_borrowed_valid_in_datum = borrow_output_usd == tusd_borrowed
 
+  let is_collateral_nft_pid_valid_in_datum = collateral_nft_pid == policy_id
+
+  let is_collateral_nft_mint = quantity == 1
+
   and {
     validate_protocol_parameters(
       reference_inputs,
@@ -111,10 +128,13 @@ fn validate_mint_borrow_nft(
       borrow_input_lovelace_value,
       borrow_output_usd,
       oracle_lovelace_usd_rate,
+      collateral_asset,
       loan_term,
     ),
     is_borrow_input_to_collateral_validator,
     is_tsud_borrowed_valid_in_datum,
+    is_collateral_nft_pid_valid_in_datum,
+    is_collateral_nft_mint,
   }
 }
 
@@ -124,6 +144,7 @@ fn validate_protocol_parameters(
   borrow_input_lovelace_value: Int,
   borrow_output_usd: Int,
   oracle_lovelace_usd_rate: Int,
+  collateral_asset: ByteArray,
   borrower_provided_loan_term: Int,
 ) {
   expect Some(protocol_parameters_ref) =
@@ -135,14 +156,16 @@ fn validate_protocol_parameters(
   expect ProtocolParametersDatum {
     min_collateral_ratio,
     min_loan_amount,
+    collateral_assets,
     loan_term,
     ..
   } = protocol_parameters_datum
 
   let hundred_percent_lovelace_value =
-    calculate_100_percent_borrow_input_value(
+    calculate_by_percentage(
       borrow_input_lovelace_value,
       min_collateral_ratio,
+      100,
     )
   let borrow_lovelace_usd_rate =
     hundred_percent_lovelace_value / borrow_output_usd
@@ -154,10 +177,13 @@ fn validate_protocol_parameters(
 
   let is_loan_term_valid = borrower_provided_loan_term <= loan_term
 
+  let is_collateral_asset = list.has(collateral_assets, collateral_asset)
+
   and {
     is_rate_and_mcr_valid,
     is_loan_amount_valid,
     is_loan_term_valid,
+    is_collateral_asset,
   }
 }
 
@@ -182,7 +208,7 @@ fn validate_burn_borrow_nft(
   } = collateral_input_datum
 
   expect [Pair(_, quantity)] =
-    mint |> tokens(collateral_nft_pid) |> dict.to_pairs
+    mint |> assets.tokens(collateral_nft_pid) |> dict.to_pairs
 
   let is_collateral_nft_burned = quantity == -1
 

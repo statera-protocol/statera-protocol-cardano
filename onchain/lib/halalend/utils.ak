@@ -25,13 +25,16 @@ pub fn is_loan_term_end(range: ValidityRange, loan_term: Int) {
   }
 }
 
-pub fn calculate_100_percent_borrow_input_value(
+/// Calculates the value of an asset by percentage
+pub fn calculate_by_percentage(
   given_value: Int,
   given_percentage: Int,
+  percentage_wanted: Int,
 ) {
-  given_value / given_percentage * 100
+  given_value / given_percentage * percentage_wanted
 }
 
+/// Finds an input by it's script hash
 pub fn find_input_by_script_hash(inputs: List<Input>, script_hash: ScriptHash) {
   list.find(
     inputs,
