@@ -104,5 +104,5 @@ fn is_liquidation_threshold_reached(
       min_liquidation_threshold,
     )
 
-  liquidation_rate <= oracle_lovelace_usd_rate
+  oracle_lovelace_usd_rate <= liquidation_rate
 }
