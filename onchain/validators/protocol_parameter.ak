@@ -39,6 +39,7 @@ test test_spend_protocol_parameter_validator_utxo() {
   let datum =
     ProtocolParametersDatum {
       min_collateral_ratio: 150,
+      min_liquidation_threshold: 120,
       min_loan_amount: 100,
       protocol_usage_fee: 5,
       collateral_assets: ["ada", "iUSD", "halalend", "hosky"],
