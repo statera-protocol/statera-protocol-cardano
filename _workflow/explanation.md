@@ -12,16 +12,21 @@
 
 ### Collateral NFT Validator (mint) <- In progress
 - Extract collateral_validator datum information
+- Get the asset to be minted
+- Verify that the quantity is 1 *
+- Verify that the collateral_nft_pid provided in the datum is the same as the minting policy *
 - Find an input of the oracle dex by the script hash
 - Find the borrow input
 - Find the borrow output that has the same address as the borrow input (Also validating that the borrowed funds will go to the provider of value)
 - Get the lovelace (ada) and usd quantity of both the oracle input and borrow input and outputs.
 - Find the borrow input's output and make sure it's going to the collateral validator *
+- Verify that the tusd that wants to be borrowed is same in the datum *
 - Extract the protocol parameters datum information
 - Calculate the 100% percent value of the collateral using the mcr
 - Calculate the borrow rate and oracle rate and make sure the rate is valid (this also validates the mcr) *
 - use the min_loan_amount to determine if the loan is valid *
 - use the loan_term to determine if the loan_term is valid *
+- validate if the collateral_asset borrowed is valid *
 
 ### Collateral NFT Validator (burn)
 - Finds an input containing a datum containing the stable coin data, `tUSD`, and the Loan NFT policy id (the input was locked to the `collateral` validator)
@@ -34,4 +39,4 @@
   - Make sure the NFT with the policy id in the datum is being burned
 - Liquidate:
   - Tx should be signed by admin
-  - The loan_term should have ended
+  - The loan_term should have ended or The collateral value should have gone below or equal to the minimum collateralization threshold
