@@ -1,13 +1,19 @@
 use aiken/collection/dict
 use aiken/collection/list
 use aiken/crypto.{ScriptHash}
-use cardano/address.{Script}
-use cardano/assets.{PolicyId, Value, lovelace_of, quantity_of}
+use cardano/address.{Address, Script}
+use cardano/assets.{
+  PolicyId, Value, from_asset, from_asset_list, from_lovelace, lovelace_of,
+  quantity_of,
+}
 use cardano/transaction.{
-  InlineDatum, Input, Output, OutputReference, Transaction, find_input,
+  InlineDatum, Input, NoDatum, Output, OutputReference, Transaction, find_input,
+  placeholder,
 }
 use halalend/datums.{CollateralDatum, ProtocolParametersDatum}
 use halalend/utils.{calculate_by_percentage, find_input_by_script_hash}
+use mocktail/virgin_key_hash.{mock_policy_id, mock_script_hash}
+use mocktail/virgin_output_reference.{mock_utxo_ref}
 
 pub type Action {
   Mint
@@ -130,11 +136,11 @@ fn validate_mint_borrow_nft(
       oracle_lovelace_usd_rate,
       collateral_asset,
       loan_term,
-    ),
-    is_borrow_input_to_collateral_validator,
-    is_tsud_borrowed_valid_in_datum,
-    is_collateral_nft_pid_valid_in_datum,
-    is_collateral_nft_mint,
+    )?,
+    is_borrow_input_to_collateral_validator?,
+    is_tsud_borrowed_valid_in_datum?,
+    is_collateral_nft_pid_valid_in_datum?,
+    is_collateral_nft_mint?,
   }
 }
 
@@ -180,10 +186,10 @@ fn validate_protocol_parameters(
   let is_collateral_asset = list.has(collateral_assets, collateral_asset)
 
   and {
-    is_rate_and_mcr_valid,
-    is_loan_amount_valid,
-    is_loan_term_valid,
-    is_collateral_asset,
+    is_rate_and_mcr_valid?,
+    is_loan_amount_valid?,
+    is_loan_term_valid?,
+    is_collateral_asset?,
   }
 }
 
@@ -242,4 +248,131 @@ fn validate_burn_borrow_nft(
     is_borrowed_amount_refunded,
     is_refund_amount_going_to_right_pool,
   }
+}
+
+// Tests
+test test_borrow() {
+  let borrow_outref = mock_utxo_ref(0, 0)
+  let borrow_script_hash = mock_script_hash(0)
+  // 15 ADA with 150% MCR @ 1.2$ per ADA so allowed to borrow $12
+  let borrow_collateral_value = from_lovelace(15000000)
+  let borrow_input =
+    Input {
+      output_reference: borrow_outref,
+      output: Output {
+        address: Address {
+          payment_credential: Script(borrow_script_hash),
+          stake_credential: None,
+        },
+        value: borrow_collateral_value,
+        datum: NoDatum,
+        reference_script: None,
+      },
+    }
+
+  let protocol_parameters_outref = mock_utxo_ref(0, 1)
+  let protocol_parameters_script_hash = mock_script_hash(1)
+  let protocol_parameters_ref =
+    Input {
+      output_reference: protocol_parameters_outref,
+      output: Output {
+        address: Address {
+          payment_credential: Script(protocol_parameters_script_hash),
+          stake_credential: None,
+        },
+        value: from_lovelace(2000000),
+        datum: InlineDatum(
+          ProtocolParametersDatum {
+            min_collateral_ratio: 150,
+            min_liquidation_threshold: 120,
+            min_loan_amount: 10,
+            protocol_usage_fee: 2,
+            collateral_assets: ["ada", "iUSD", "halalend", "hosky"],
+            loan_term: 12000,
+          },
+        ),
+        reference_script: None,
+      },
+    }
+
+  let collateral_nft_policy_id = mock_policy_id(1)
+  let collateral_validator_script_hash = mock_script_hash(2)
+  let test_usd_policy_id = mock_policy_id(0)
+  let test_usd_asset_name = "tUSD"
+  let collateral_validator_output =
+    Output {
+      address: Address {
+        payment_credential: Script(collateral_validator_script_hash),
+        stake_credential: None,
+      },
+      value: borrow_collateral_value,
+      datum: InlineDatum(
+        CollateralDatum {
+          tusd_pool_hash: mock_script_hash(3),
+          tusd_policy_id: test_usd_policy_id,
+          tusd_asset_name: test_usd_asset_name,
+          tusd_borrowed: 12,
+          collateral_nft_pid: collateral_nft_policy_id,
+          // $1.2 (per ADA)
+          collateral_rate_in_lovelace: 1200000,
+          collateral_asset: "ada",
+          loan_term: 10000,
+        },
+      ),
+      reference_script: None,
+    }
+
+  let oracle_outref = mock_utxo_ref(0, 2)
+  let oracle_script_hash = mock_script_hash(4)
+  let oracle_ref =
+    Input {
+      output_reference: oracle_outref,
+      output: Output {
+        address: Address {
+          payment_credential: Script(oracle_script_hash),
+          stake_credential: None,
+        },
+        // $24 / 20000000 lovelaces == $1.2/lovelace
+        value: assets.merge(
+          from_lovelace(20000000),
+          from_asset(test_usd_policy_id, test_usd_asset_name, 24),
+        ),
+        datum: NoDatum,
+        reference_script: None,
+      },
+    }
+
+  let borrow_output =
+    Output {
+      address: Address {
+        payment_credential: Script(borrow_script_hash),
+        stake_credential: None,
+      },
+      // Borrowers should be given $12 USD as he provided an over-collaterized asset
+      // of ADA in 15 ADA (normal - 10 ADA) @ $1.2 USD per ADA rate
+      value: from_asset(test_usd_policy_id, test_usd_asset_name, 12),
+      datum: NoDatum,
+      reference_script: None,
+    }
+
+  let mint =
+    from_asset_list([Pair(collateral_nft_policy_id, [Pair("BorrowNFT1", 1)])])
+  let tx =
+    Transaction {
+      ..placeholder,
+      inputs: [borrow_input],
+      outputs: [collateral_validator_output, borrow_output],
+      reference_inputs: [protocol_parameters_ref, oracle_ref],
+      mint: mint,
+    }
+
+  collateral_nft.mint(
+    borrow_outref,
+    collateral_validator_script_hash,
+    protocol_parameters_script_hash,
+    oracle_script_hash,
+    Mint,
+    collateral_nft_policy_id,
+    tx,
+  )
 }
