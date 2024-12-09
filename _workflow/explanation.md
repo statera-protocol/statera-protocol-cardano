@@ -18,9 +18,12 @@
 - Find an input of the oracle dex by the script hash
 - Find the borrow input
 - Find the borrow output that has the same address as the borrow input (Also validating that the borrowed funds will go to the provider of value)
-- Get the lovelace (ada) and usd quantity of both the oracle input and borrow input and outputs.
-- Find the borrow input's output and make sure it's going to the collateral validator *
+- Get the lovelace (ada) and usd quantity of the oracle ref input and usd quantity of the borrow output.
+- Find an output with the same value as collateral_amount_in_lovelace and make sure it's going to the collateral validator *
 - Verify that the tusd that wants to be borrowed is same in the datum *
+- verify that the policy id in collateral datum is same policy id in validator *
+- verify that the nft about to be minted is 1 *
+- verify that the nft is going to the borrower's wallet
 - Extract the protocol parameters datum information
 - Calculate the 100% percent value of the collateral using the mcr
 - Calculate the borrow rate and oracle rate and make sure the rate is valid (this also validates the mcr) *
