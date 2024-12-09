@@ -1,12 +1,22 @@
 use aiken/collection/dict
-use aiken/crypto.{ScriptHash, VerificationKeyHash}
-use cardano/assets.{AssetName, PolicyId, lovelace_of, quantity_of}
-use cardano/transaction.{InlineDatum, Input, OutputReference, Transaction}
+use aiken/crypto.{ScriptHash}
+use aiken/interval.{Finite, Interval, IntervalBound, PositiveInfinity}
+use cardano/address.{Address, Script}
+use cardano/assets.{
+  AssetName, PolicyId, from_asset, from_asset_list, from_lovelace, lovelace_of,
+  quantity_of,
+}
+use cardano/transaction.{
+  InlineDatum, Input, NoDatum, Output, OutputReference, Transaction,
+  ValidityRange, placeholder,
+}
+use halalend/constants.{usd_with_lovelace_precision_factor}
 use halalend/datums.{CollateralDatum, ProtocolParametersDatum}
 use halalend/utils.{
-  calculate_by_percentage, find_input_by_script_hash, is_loan_term_end,
-  signed_by,
+  calculate_by_percentage, find_input_by_hash, is_loan_term_end,
 }
+use mocktail/virgin_key_hash.{mock_policy_id, mock_script_hash}
+use mocktail/virgin_output_reference.{mock_utxo_ref}
 
 pub type Action {
   Refund
@@ -14,7 +24,6 @@ pub type Action {
 }
 
 validator collateral_validator(
-  admin: VerificationKeyHash,
   protocol_parameters_hash: ScriptHash,
   oracle_hash: ScriptHash,
 ) {
@@ -24,18 +33,12 @@ validator collateral_validator(
     _o: OutputReference,
     self: Transaction,
   ) {
-    let Transaction {
-      mint,
-      validity_range,
-      extra_signatories,
-      reference_inputs,
-      ..
-    } = self
+    let Transaction { mint, validity_range, reference_inputs, .. } = self
 
     expect Some(CollateralDatum {
       tusd_policy_id,
       tusd_asset_name,
-      collateral_nft_pid,
+      loan_nft_pid,
       collateral_rate_in_lovelace,
       loan_term,
       ..
@@ -44,14 +47,13 @@ validator collateral_validator(
     when redeemer is {
       Refund -> {
         expect [Pair(_, quantity)] =
-          mint |> assets.tokens(collateral_nft_pid) |> dict.to_pairs
+          mint |> assets.tokens(loan_nft_pid) |> dict.to_pairs
 
-        quantity == -1
+        (quantity == -1)?
       }
 
-      Liquidate -> and {
-          is_loan_term_end(validity_range, loan_term),
-          signed_by(extra_signatories, admin),
+      Liquidate -> or {
+          is_loan_term_end(validity_range, loan_term)?,
           is_liquidation_threshold_reached(
             protocol_parameters_hash,
             oracle_hash,
@@ -78,7 +80,7 @@ fn is_liquidation_threshold_reached(
   tusd_asset_name: AssetName,
 ) {
   expect Some(protocol_parameters_ref) =
-    find_input_by_script_hash(reference_inputs, protocol_parameters_hash)
+    find_input_by_hash(reference_inputs, protocol_parameters_hash)
 
   expect InlineDatum(protocol_parameters_datum) =
     protocol_parameters_ref.output.datum
@@ -89,13 +91,13 @@ fn is_liquidation_threshold_reached(
     ..
   } = protocol_parameters_datum
 
-  expect Some(oracle_ref) =
-    find_input_by_script_hash(reference_inputs, oracle_hash)
+  expect Some(oracle_ref) = find_input_by_hash(reference_inputs, oracle_hash)
 
   let oracle_lovelace_value = lovelace_of(oracle_ref.output.value)
   let oracle_usd_value =
     quantity_of(oracle_ref.output.value, tusd_policy_id, tusd_asset_name)
-  let oracle_lovelace_usd_rate = oracle_lovelace_value / oracle_usd_value
+  let oracle_lovelace_usd_rate =
+    oracle_usd_value * usd_with_lovelace_precision_factor / oracle_lovelace_value
 
   let liquidation_rate =
     calculate_by_percentage(
@@ -104,5 +106,168 @@ fn is_liquidation_threshold_reached(
       min_liquidation_threshold,
     )
 
-  oracle_lovelace_usd_rate <= liquidation_rate
+  (oracle_lovelace_usd_rate <= liquidation_rate)?
+}
+
+// Tests
+fn get_collateral_details() {
+  let loan_nft_policy_id = mock_policy_id(0)
+
+  let collateral_validator_script_hash = mock_script_hash(2)
+  let tusd_pool_script_hash = mock_script_hash(3)
+  let test_usd_policy_id = mock_policy_id(0)
+  let test_usd_asset_name = "tUSD"
+  let collateral_amount_in_lovelace = 15000000
+  let collateral_datum =
+    CollateralDatum {
+      tusd_pool_hash: tusd_pool_script_hash,
+      tusd_policy_id: test_usd_policy_id,
+      tusd_asset_name: test_usd_asset_name,
+      tusd_borrowed: 12,
+      loan_nft_pid: loan_nft_policy_id,
+      // $1.2 (per ADA)
+      collateral_rate_in_lovelace: 1200000,
+      collateral_asset: "ada",
+      collateral_amount_in_lovelace,
+      loan_term: 10000,
+    }
+  let collateral_input =
+    Input {
+      output_reference: mock_utxo_ref(0, 1),
+      output: Output {
+        address: Address {
+          payment_credential: Script(collateral_validator_script_hash),
+          stake_credential: None,
+        },
+        value: from_lovelace(collateral_amount_in_lovelace),
+        datum: InlineDatum(collateral_datum),
+        reference_script: None,
+      },
+    }
+
+  (collateral_datum, collateral_input)
+}
+
+test test_refund_loan() {
+  let loan_nft_policy_id = mock_policy_id(0)
+  let protocol_parameters_script_hash = mock_script_hash(1)
+  let oracle_script_hash = mock_script_hash(4)
+
+  let (collateral_datum, collateral_input) = get_collateral_details()
+
+  let mint =
+    from_asset_list([Pair(loan_nft_policy_id, [Pair("BorrowNFT1", -1)])])
+
+  let tx = Transaction { ..placeholder, inputs: [collateral_input], mint: mint }
+
+  collateral_validator.spend(
+    protocol_parameters_script_hash,
+    oracle_script_hash,
+    Some(collateral_datum),
+    Refund,
+    mock_utxo_ref(0, 8),
+    tx,
+  )
+}
+
+test test_liquidate_loan_with_loan_term_end() {
+  let protocol_parameters_script_hash = mock_script_hash(1)
+  let oracle_script_hash = mock_script_hash(4)
+
+  let (collateral_datum, collateral_input) = get_collateral_details()
+
+  let validity_range: ValidityRange =
+    Interval {
+      lower_bound: IntervalBound {
+        bound_type: Finite(11000),
+        is_inclusive: True,
+      },
+      upper_bound: IntervalBound {
+        bound_type: PositiveInfinity,
+        is_inclusive: False,
+      },
+    }
+
+  let tx =
+    Transaction {
+      ..placeholder,
+      inputs: [collateral_input],
+      validity_range: validity_range,
+    }
+
+  collateral_validator.spend(
+    protocol_parameters_script_hash,
+    oracle_script_hash,
+    Some(collateral_datum),
+    Liquidate,
+    mock_utxo_ref(0, 10),
+    tx,
+  )
+}
+
+test test_liquidate_loan_with_liquidation_threshold_reached() {
+  let protocol_parameters_script_hash = mock_script_hash(1)
+  let oracle_script_hash = mock_script_hash(4)
+
+  let (collateral_datum, collateral_input) = get_collateral_details()
+
+  let protocol_parameters_ref =
+    Input {
+      output_reference: mock_utxo_ref(0, 1),
+      output: Output {
+        address: Address {
+          payment_credential: Script(protocol_parameters_script_hash),
+          stake_credential: None,
+        },
+        value: from_lovelace(2000000),
+        datum: InlineDatum(
+          ProtocolParametersDatum {
+            min_collateral_ratio: 150,
+            min_liquidation_threshold: 120,
+            min_loan_amount: 10,
+            protocol_usage_fee: 2,
+            collateral_assets: ["ada", "iUSD", "halalend", "hosky"],
+            loan_term: 12000,
+          },
+        ),
+        reference_script: None,
+      },
+    }
+
+  let test_usd_policy_id = mock_policy_id(0)
+  let test_usd_asset_name = "tUSD"
+  let oracle_ref =
+    Input {
+      output_reference: mock_utxo_ref(0, 2),
+      output: Output {
+        address: Address {
+          payment_credential: Script(oracle_script_hash),
+          stake_credential: None,
+        },
+        // $24 / 40000000 lovelaces == $0.6/lovelace lower than liq. price
+        //  (initial price was $1.2)
+        value: assets.merge(
+          from_lovelace(40000000),
+          from_asset(test_usd_policy_id, test_usd_asset_name, 24),
+        ),
+        datum: NoDatum,
+        reference_script: None,
+      },
+    }
+
+  let tx =
+    Transaction {
+      ..placeholder,
+      inputs: [collateral_input],
+      reference_inputs: [protocol_parameters_ref, oracle_ref],
+    }
+
+  collateral_validator.spend(
+    protocol_parameters_script_hash,
+    oracle_script_hash,
+    Some(collateral_datum),
+    Liquidate,
+    mock_utxo_ref(0, 12),
+    tx,
+  )
 }

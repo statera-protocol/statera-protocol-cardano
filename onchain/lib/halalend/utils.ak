@@ -2,7 +2,8 @@ use aiken/collection/list
 use aiken/crypto.{ScriptHash, VerificationKeyHash}
 use aiken/interval.{Finite}
 use cardano/address.{Script}
-use cardano/transaction.{Input, OutputReference, ValidityRange}
+use cardano/assets.{AssetName, PolicyId, quantity_of}
+use cardano/transaction.{Input, Output, OutputReference, ValidityRange}
 
 // validate that the transaction is signed by 'signer'
 pub fn signed_by(
@@ -35,9 +36,41 @@ pub fn calculate_by_percentage(
 }
 
 /// Finds an input by it's script hash
-pub fn find_input_by_script_hash(inputs: List<Input>, script_hash: ScriptHash) {
+pub fn find_input_by_hash(inputs: List<Input>, script_hash: ScriptHash) {
   list.find(
     inputs,
     fn(input) { input.output.address.payment_credential == Script(script_hash) },
   )
+}
+
+/// Finds an input by it's script hash
+pub fn find_output_by_hash(outputs: List<Output>, script_hash: ScriptHash) {
+  list.find(
+    outputs,
+    fn(output) { output.address.payment_credential == Script(script_hash) },
+  )
+}
+
+pub fn validate_pool_hash(
+  inputs: List<Input>,
+  tusd_policy_id: PolicyId,
+  tusd_asset_name: AssetName,
+  tusd_pool_hash: ScriptHash,
+) {
+  let tusd_inputs =
+    inputs
+      |> list.filter(
+          fn(input) {
+            (
+              input.output.value |> quantity_of(tusd_policy_id, tusd_asset_name)
+            ) > 0
+          },
+        )
+
+  tusd_inputs
+    |> list.all(
+        fn(input) {
+          input.output.address.payment_credential == Script(tusd_pool_hash)
+        },
+      )
 }
