@@ -51,6 +51,7 @@ pub fn find_output_by_hash(outputs: List<Output>, script_hash: ScriptHash) {
   )
 }
 
+/// Validate all inputs coming from one pool hash
 pub fn validate_pool_hash(
   inputs: List<Input>,
   tusd_policy_id: PolicyId,
@@ -73,4 +74,12 @@ pub fn validate_pool_hash(
           input.output.address.payment_credential == Script(tusd_pool_hash)
         },
       )
+}
+
+/// Get the borrower's loan term in milli seconds
+pub fn get_borrower_loan_term(loan_term: Int, range: ValidityRange) {
+  when range.lower_bound.bound_type is {
+    Finite(time_now) -> (loan_term - time_now)
+    _ -> 1_000_000_000_000_000_000_000_000_000_000_000_000
+  }
 }

@@ -1,1 +1,2 @@
 - Protocol usage fee and collateral assets units (policy id + asset name) of protocol parameters are not currently used in the protocol
+- Protocol parameter validator hash and oracle validator hash are passed as parameters. Any user can pass a different hash and use as his own. Change them to use environment variables instead of parameters for security reasons
