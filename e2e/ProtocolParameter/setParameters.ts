@@ -4,6 +4,7 @@ import { scriptAddr } from "./validator.js";
 
 const ProtocolParametersDatum = mConStr0([
     150,
+    120,
     100,
     5,
     ["ada", "iUSD", "halalend", "hosky"],

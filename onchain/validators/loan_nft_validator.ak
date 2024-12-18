@@ -208,8 +208,12 @@ fn validate_protocol_parameters(
 
   let is_loan_amount_valid = borrow_output_usd >= min_loan_amount
 
+  let borrower_loan_term = get_borrower_loan_term(borrower_provided_loan_term, validity_range)
   let is_loan_term_valid =
-    get_borrower_loan_term(borrower_provided_loan_term, validity_range) <= loan_term
+    borrower_loan_term <= loan_term
+  trace @"borrower_provided_loan_term": borrower_provided_loan_term
+  trace @"borrower loan term": borrower_loan_term
+  trace @"param loan_term": loan_term
 
   let is_collateral_asset = list.has(collateral_assets, collateral_asset)
 
@@ -431,6 +435,17 @@ test test_borrow_with_right_values() {
   let mint =
     from_asset_list([Pair(loan_nft_policy_id, [Pair("BorrowNFT1", 1)])])
 
+  // let validity_range: ValidityRange =
+  //   Interval {
+  //     lower_bound: IntervalBound {
+  //       bound_type: NegativeInfinity,
+  //       is_inclusive: True,
+  //     },
+  //     upper_bound: IntervalBound {
+  //       bound_type: Finite(finite_time_now),
+  //       is_inclusive: False,
+  //     },
+  //   }
   let validity_range: ValidityRange =
     Interval {
       lower_bound: IntervalBound {

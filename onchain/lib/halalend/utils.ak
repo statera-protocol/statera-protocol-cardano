@@ -1,6 +1,6 @@
 use aiken/collection/list
 use aiken/crypto.{ScriptHash, VerificationKeyHash}
-use aiken/interval.{Finite}
+use aiken/interval.{Finite, PositiveInfinity}
 use cardano/address.{Script}
 use cardano/assets.{AssetName, PolicyId, quantity_of}
 use cardano/transaction.{Input, Output, OutputReference, ValidityRange}
@@ -43,6 +43,22 @@ pub fn find_input_by_hash(inputs: List<Input>, script_hash: ScriptHash) {
   )
 }
 
+/// Filters inputs by hash
+pub fn filter_inputs_by_hash(inputs: List<Input>, script_hash: ScriptHash) {
+  list.filter(
+    inputs,
+    fn(input) { input.output.address.payment_credential == Script(script_hash) },
+  )
+}
+
+/// Filters outputs by hash
+pub fn filter_outputs_by_hash(outputs: List<Output>, script_hash: ScriptHash) {
+  list.filter(
+    outputs,
+    fn(output) { output.address.payment_credential == Script(script_hash) },
+  )
+}
+
 /// Finds an input by it's script hash
 pub fn find_output_by_hash(outputs: List<Output>, script_hash: ScriptHash) {
   list.find(
@@ -79,7 +95,17 @@ pub fn validate_pool_hash(
 /// Get the borrower's loan term in milli seconds
 pub fn get_borrower_loan_term(loan_term: Int, range: ValidityRange) {
   when range.lower_bound.bound_type is {
-    Finite(time_now) -> (loan_term - time_now)
-    _ -> 1_000_000_000_000_000_000_000_000_000_000_000_000
+    Finite(time_now) -> {
+      trace @"time_now": time_now
+      (loan_term - time_now)
+    }
+    PositiveInfinity -> {
+      trace @"lower bound is positive infinity"
+      1_000_000_000_000_000_000_000_000_000_000_000_000
+    }
+    _ -> {
+      trace @"borrower provided loan term is too high"
+      1_000_000_000_000_000_000_000_000_000_000_000_000
+    }
   }
 }

@@ -1,5 +1,6 @@
 import {
     BlockfrostProvider,
+    MaestroProvider,
     MeshTxBuilder,
     MeshWallet,
     deserializeAddress,
@@ -8,23 +9,24 @@ import { UTxO } from "@meshsdk/common";
 import dotenv from "dotenv";
 dotenv.config();
 import blueprint from "../onchain/plutus.json" with { type: "json" };
+import { OfflineEvaluator } from "@meshsdk/core-csl";
 
 // Setup blockhain provider as Maestro
-// const maestroKey = process.env.MAESTRO_KEY;
-// if (!maestroKey) {
-//     throw new Error("MAESTRO_KEY does not exist");
-// }
-// const blockchainProvider = new MaestroProvider({
-//     network: 'Preprod',
-//     apiKey: maestroKey,
-// });
+const maestroKey = process.env.MAESTRO_KEY;
+if (!maestroKey) {
+    throw new Error("MAESTRO_KEY does not exist");
+}
+const blockchainProvider = new MaestroProvider({
+    network: 'Preprod',
+    apiKey: maestroKey,
+});
 
 // Setup blockhain provider as Blockfrost
-const blockfrostId = process.env.BLOCKFROST_ID;
-if (!blockfrostId) {
-    throw new Error("BLOCKFROST_ID does not exist");
-}
-const blockchainProvider = new BlockfrostProvider(blockfrostId);
+// const blockfrostId = process.env.BLOCKFROST_ID;
+// if (!blockfrostId) {
+//     throw new Error("BLOCKFROST_ID does not exist");
+// }
+// const blockchainProvider = new BlockfrostProvider(blockfrostId);
 
 // import admin's wallet passphrase and initialize the wallet
 const wallet1Passphrase = process.env.WALLET_PASSPHRASE_ONE;
@@ -51,16 +53,21 @@ if (!wallet1Collateral) {
 
 const { pubKeyHash: wallet1VK } = deserializeAddress(wallet1Address);
 
+// Evaluator for Aiken verbose mode
+// const evaluator = new OfflineEvaluator(blockchainProvider, "preprod");
 // Create transaction builder
 const txBuilder = new MeshTxBuilder({
     fetcher: blockchainProvider,
     submitter: blockchainProvider,
+    // evaluator: evaluator,
     verbose: false,
 });
 txBuilder.setNetwork('preprod');
 
 export {
     blueprint,
+    maestroKey,
+    wallet1Passphrase,
     blockchainProvider,
     txBuilder,
     wallet1,

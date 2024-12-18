@@ -19,6 +19,7 @@ type ProtocolParametersDatum = ConStr0<
         Integer,
         Integer,
         Integer,
+        Integer,
         List<BuiltinByteString>,
         Integer,
     ]
@@ -34,14 +35,14 @@ const datum = deserializeDatum<ProtocolParametersDatum>(protocolParameterUtxo.ou
 console.log('Protocol Parameters Datum:', datum, '\n');
 
 const collateralAssets: string[] = [];
-datum.fields[3].list.forEach(asset => collateralAssets.push(Buffer.from(asset.bytes, "hex").toString("utf8")));
+datum.fields[4].list.forEach(asset => collateralAssets.push(Buffer.from(asset.bytes, "hex").toString("utf8")));
 
 console.log(`
-    Protocol Parameters Reconstructed keeping in mind that all ints (excluding loan term) were multiplied by 10_000
     Protocol parameters:
         min_collateral_ratio: ${Number(datum.fields[0].int)}%,
-        min_loan_amount: ${Number(datum.fields[1].int)},
-        protocol_usage_fee: ${Number(datum.fields[2].int)},
+        min_liquidation_amount: ${Number(datum.fields[1].int)}%,
+        min_loan_amount: ${Number(datum.fields[2].int)},
+        protocol_usage_fee: ${Number(datum.fields[3].int)},
         collateral_assets: ${collateralAssets.join(", ")},
-        loan_term: ${datum.fields[4].int} milli seconds,
+        loan_term: ${datum.fields[5].int} milli seconds,
 `);

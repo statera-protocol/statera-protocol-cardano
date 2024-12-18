@@ -14,18 +14,19 @@ const tokenNameHex = stringToHex(tokenName);
 
 let batch_mint = txBuilder
   .mintPlutusScriptV3()
-  .mint("100", policyId, tokenNameHex)
+  .mint("1000", policyId, tokenNameHex)
   .mintingScript(validatorScript)
   .mintRedeemerValue(mConStr0([]))
-  .txOut('addr_test1wrp59dplx70xac39tqms9wzp5eptnvxwwehaem5m0fhklwqq92aad', [{ unit: `${policyId}${tokenNameHex}`, quantity: '100' }])
+  .txOut('addr_test1wr9gscmlw4k8ugrs9g4a7zqq9sjjg4epzgwpl46g9kpymccmc67a6', [{ unit: `${policyId}${tokenNameHex}`, quantity: '1000' }])
+  // .txOut('addr_test1qztvhvnujmd03j4cjr0x6lu87hlaqfdl3tyqw97tcnaw0kk5wsnj53x9v8dhupg6v8rzt48atr6zmrvlppkam7upd29sqeutm7', [{ unit: `${policyId}${tokenNameHex}`, quantity: '100' }])
 
-for (let i = 0; i < 9; i++) {
+for (let i = 0; i < 3; i++) {
   batch_mint = batch_mint
   .mintPlutusScriptV3()
-  .mint("100", policyId, tokenNameHex)
+  .mint("1000", policyId, tokenNameHex)
   .mintingScript(validatorScript)
   .mintRedeemerValue(mConStr0([]))
-  .txOut('addr_test1wrp59dplx70xac39tqms9wzp5eptnvxwwehaem5m0fhklwqq92aad', [{ unit: `${policyId}${tokenNameHex}`, quantity: '100' }])
+  .txOut('addr_test1wr9gscmlw4k8ugrs9g4a7zqq9sjjg4epzgwpl46g9kpymccmc67a6', [{ unit: `${policyId}${tokenNameHex}`, quantity: '1000' }])
 }
 
 const unsignedTx = await batch_mint

@@ -3,18 +3,25 @@ use aiken/crypto.{ScriptHash}
 use cardano/address.{Address, Script}
 use cardano/assets.{AssetName, PolicyId, from_asset, from_lovelace, quantity_of}
 use cardano/transaction.{
-  InlineDatum, NoDatum, Output, OutputReference, Transaction, placeholder,
+  InlineDatum, Input, NoDatum, Output, OutputReference, Transaction, find_input,
+  placeholder,
 }
 use halalend/datums.{CollateralDatum}
-use halalend/utils.{find_output_by_hash}
+use halalend/utils.{
+  filter_inputs_by_hash, filter_outputs_by_hash, find_output_by_hash,
+}
 use mocktail/virgin_key_hash.{
   mock_policy_id, mock_pub_key_hash, mock_script_hash,
 }
 use mocktail/virgin_output_reference.{mock_utxo_ref}
 
 validator liquidity_pool(collateral_validator_hash: ScriptHash) {
-  spend(_d: Option<Data>, _r: Data, _o: OutputReference, self: Transaction) {
-    let Transaction { outputs, .. } = self
+  spend(_d: Option<Data>, _r: Data, o_ref: OutputReference, self: Transaction) {
+    let Transaction { inputs, outputs, .. } = self
+
+    expect Some(own_input) = find_input(inputs, o_ref)
+    expect Script(liquidity_pool_hash) =
+      own_input.output.address.payment_credential
 
     expect Some(collateral_output) =
       find_output_by_hash(outputs, collateral_validator_hash)
@@ -22,18 +29,26 @@ validator liquidity_pool(collateral_validator_hash: ScriptHash) {
     expect InlineDatum(collateral_output_datum) = collateral_output.datum
 
     expect CollateralDatum {
+      tusd_pool_hash,
       tusd_policy_id,
       tusd_asset_name,
       tusd_borrowed,
       ..
     } = collateral_output_datum
 
-    output_tusd_must_equal_tusd_borrowed(
-      outputs,
-      tusd_policy_id,
-      tusd_asset_name,
-      tusd_borrowed,
-    )
+    let validate_pool_hash = tusd_pool_hash == liquidity_pool_hash
+
+    and {
+      validate_pool_hash?,
+      output_tusd_must_equal_input_minus_borrowed(
+        liquidity_pool_hash,
+        inputs,
+        outputs,
+        tusd_policy_id,
+        tusd_asset_name,
+        tusd_borrowed,
+      )?,
+    }
   }
 
   else(_) {
@@ -41,14 +56,31 @@ validator liquidity_pool(collateral_validator_hash: ScriptHash) {
   }
 }
 
-fn output_tusd_must_equal_tusd_borrowed(
+fn output_tusd_must_equal_input_minus_borrowed(
+  liquidity_pool_hash: ScriptHash,
+  inputs: List<Input>,
   outputs: List<Output>,
   tusd_policy_id: PolicyId,
   tusd_asset_name: AssetName,
   tusd_borrowed: Int,
 ) {
-  let tusd_total_in_outputs =
-    outputs
+  let inputs_from_pool = filter_inputs_by_hash(inputs, liquidity_pool_hash)
+
+  let tusd_total_in_inputs_from_pool =
+    inputs_from_pool
+      |> list.foldl(
+          0,
+          fn(input, tusd_total) {
+            let tusd_amount =
+              input.output.value |> quantity_of(tusd_policy_id, tusd_asset_name)
+            tusd_amount + tusd_total
+          },
+        )
+
+  let outputs_from_pool = filter_outputs_by_hash(outputs, liquidity_pool_hash)
+
+  let tusd_total_in_outputs_to_pool =
+    outputs_from_pool
       |> list.foldl(
           0,
           fn(output, tusd_total) {
@@ -58,16 +90,16 @@ fn output_tusd_must_equal_tusd_borrowed(
           },
         )
 
-  (tusd_total_in_outputs == tusd_borrowed)?
+  (tusd_total_in_inputs_from_pool - tusd_borrowed == tusd_total_in_outputs_to_pool)?
 }
 
 // Tests
-fn get_borrow_spend_tx(
-  borrow_output_tusd_amount: Int,
-  borrow_outputs: Option<List<Output>>,
-) {
+test spend_from_liquidity_pool_when_borrowing() {
+  let liquidity_pool_oref = mock_utxo_ref(0, 0)
+
   let loan_nft_policy_id = mock_policy_id(1)
   let collateral_validator_script_hash = mock_script_hash(2)
+  let test_usd_pool_hash = mock_script_hash(3)
   let test_usd_policy_id = mock_policy_id(0)
   let test_usd_asset_name = "tUSD"
   let collateral_amount_in_lovelace = 15000000
@@ -80,7 +112,7 @@ fn get_borrow_spend_tx(
       value: from_lovelace(collateral_amount_in_lovelace),
       datum: InlineDatum(
         CollateralDatum {
-          tusd_pool_hash: mock_script_hash(3),
+          tusd_pool_hash: test_usd_pool_hash,
           tusd_policy_id: test_usd_policy_id,
           tusd_asset_name: test_usd_asset_name,
           tusd_borrowed: 12,
@@ -105,77 +137,64 @@ fn get_borrow_spend_tx(
       // Borrowers should be given $12 USD as he provided an over-collaterized asset
       // of ADA in 15 ADA (normal - 10 ADA) @ $1.2 USD per ADA rate
       value: assets.merge(
-        from_asset(
-          test_usd_policy_id,
-          test_usd_asset_name,
-          borrow_output_tusd_amount,
-        ),
+        from_asset(test_usd_policy_id, test_usd_asset_name, 12),
         from_asset(loan_nft_policy_id, "BorrowNFT1", 1),
       ),
       datum: NoDatum,
       reference_script: None,
     }
 
-  let more_outputs =
-    when borrow_outputs is {
-      Some(outputs) -> outputs
-      None -> []
+  let liquidity_input =
+    Input {
+      output_reference: liquidity_pool_oref,
+      output: Output {
+        address: Address {
+          payment_credential: Script(test_usd_pool_hash),
+          stake_credential: None,
+        },
+        value: from_asset(test_usd_policy_id, test_usd_asset_name, 10),
+        datum: NoDatum,
+        reference_script: None,
+      },
+    }
+
+  let liquidity_input2 =
+    Input {
+      output_reference: liquidity_pool_oref,
+      output: Output {
+        address: Address {
+          payment_credential: Script(test_usd_pool_hash),
+          stake_credential: None,
+        },
+        value: from_asset(test_usd_policy_id, test_usd_asset_name, 25),
+        datum: NoDatum,
+        reference_script: None,
+      },
+    }
+  
+  let liquidity_output =
+    Output {
+      address: Address {
+        payment_credential: Script(test_usd_pool_hash),
+        stake_credential: None,
+      },
+      value: from_asset(test_usd_policy_id, test_usd_asset_name, 23),
+      datum: NoDatum,
+      reference_script: None,
     }
 
   let tx =
     Transaction {
       ..placeholder,
-      outputs: [collateral_validator_output, borrow_output, ..more_outputs],
+      inputs: [liquidity_input, liquidity_input2],
+      outputs: [collateral_validator_output, borrow_output, liquidity_output],
     }
 
   liquidity_pool.spend(
     collateral_validator_script_hash,
     None,
     "",
-    mock_utxo_ref(0, 0),
+    liquidity_pool_oref,
     tx,
   )
-}
-
-test test_borrow_spend_with_right_output() {
-  get_borrow_spend_tx(12, None)
-}
-
-test test_borrow_spend_with_wrong_output() fail {
-  get_borrow_spend_tx(15, None)
-}
-
-test test_borrow_spend_with_malicious_outputs() fail {
-  let test_usd_policy_id = mock_policy_id(0)
-  let test_usd_asset_name = "tUSD"
-  let loan_nft_policy_id = mock_policy_id(1)
-  let borrow_key_hash = mock_pub_key_hash(0)
-  let malicious_output1 =
-    Output {
-      address: Address {
-        payment_credential: Script(borrow_key_hash),
-        stake_credential: None,
-      },
-      value: assets.merge(
-        from_asset(test_usd_policy_id, test_usd_asset_name, 7),
-        from_asset(loan_nft_policy_id, "BorrowNFT1", 1),
-      ),
-      datum: NoDatum,
-      reference_script: None,
-    }
-  let malicious_output2 =
-    Output {
-      address: Address {
-        payment_credential: Script(borrow_key_hash),
-        stake_credential: None,
-      },
-      value: assets.merge(
-        from_asset(test_usd_policy_id, test_usd_asset_name, 3),
-        from_asset(loan_nft_policy_id, "BorrowNFT1", 1),
-      ),
-      datum: NoDatum,
-      reference_script: None,
-    }
-
-  get_borrow_spend_tx(12, Some([malicious_output1, malicious_output2]))
 }
