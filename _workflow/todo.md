@@ -3,6 +3,4 @@
 - Protocol parameter validator hash and oracle validator hash are passed as parameters. Any user can pass a different hash and use as his own. Change them to use environment variables instead of parameters for security reasons or use suggestion in Emurgo
 
 <!-- IMMEDIATE CHANGES -->
-- Change the collateraldatum to store the NFT asset unit instead of the policyID
 - User's loanNFTValidator script hash has to be stored somewhere so as to be reused during repayment
-- Liquidation is not validating where liquidated funds go to
