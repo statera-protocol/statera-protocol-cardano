@@ -8,12 +8,13 @@ use cardano/assets.{
 }
 use cardano/transaction.{
   InlineDatum, Input, NoDatum, Output, OutputReference, Transaction,
-  ValidityRange, placeholder,
+  ValidityRange, find_input, placeholder,
 }
 use halalend/constants.{usd_with_lovelace_precision_factor}
 use halalend/datums.{CollateralDatum, ProtocolParametersDatum}
 use halalend/utils.{
-  calculate_by_percentage, find_input_by_hash, is_loan_term_end,
+  calculate_by_percentage, find_input_by_hash, find_output_by_hash,
+  is_loan_term_end,
 }
 use mocktail/virgin_key_hash.{mock_policy_id, mock_script_hash}
 use mocktail/virgin_output_reference.{mock_utxo_ref}
@@ -26,14 +27,24 @@ pub type Action {
 validator collateral_validator(
   protocol_parameters_hash: ScriptHash,
   oracle_hash: ScriptHash,
+  liquidated_funds_collector_hash: ScriptHash,
 ) {
   spend(
     datum: Option<CollateralDatum>,
     redeemer: Action,
-    _o: OutputReference,
+    o_ref: OutputReference,
     self: Transaction,
   ) {
-    let Transaction { mint, validity_range, reference_inputs, .. } = self
+    let Transaction {
+      inputs,
+      outputs,
+      mint,
+      validity_range,
+      reference_inputs,
+      ..
+    } = self
+
+    expect Some(own_input) = find_input(inputs, o_ref)
 
     expect Some(CollateralDatum {
       tusd_policy_id,
@@ -52,15 +63,22 @@ validator collateral_validator(
         (quantity == -1)?
       }
 
-      Liquidate -> or {
-          is_loan_term_end(validity_range, loan_term)?,
-          is_liquidation_threshold_reached(
-            protocol_parameters_hash,
-            oracle_hash,
-            collateral_rate_in_lovelace,
-            reference_inputs,
-            tusd_policy_id,
-            tusd_asset_name,
+      Liquidate -> and {
+          or {
+            is_loan_term_end(validity_range, loan_term)?,
+            is_liquidation_threshold_reached(
+              protocol_parameters_hash,
+              oracle_hash,
+              collateral_rate_in_lovelace,
+              reference_inputs,
+              tusd_policy_id,
+              tusd_asset_name,
+            ),
+          },
+          liquidated_funds_must_go_to_collector(
+            outputs,
+            own_input,
+            liquidated_funds_collector_hash,
           ),
         }
     }
@@ -109,6 +127,23 @@ fn is_liquidation_threshold_reached(
   (oracle_lovelace_usd_rate <= liquidation_rate)?
 }
 
+fn liquidated_funds_must_go_to_collector(
+  outputs: List<Output>,
+  own_input: Input,
+  liquidated_funds_collector_hash: ScriptHash,
+) {
+  expect InlineDatum(datum_data) = own_input.output.datum
+  expect CollateralDatum { .. } = datum_data
+
+  expect Some(collector_output) =
+    find_output_by_hash(outputs, liquidated_funds_collector_hash)
+
+  let own_input_lovelace_value = own_input.output.value |> lovelace_of
+  let collector_output_lovelace_value = collector_output.value |> lovelace_of
+
+  (own_input_lovelace_value == collector_output_lovelace_value)?
+}
+
 // Tests
 fn get_collateral_details() {
   let loan_nft_policy_id = mock_policy_id(0)
@@ -152,6 +187,8 @@ test test_refund_loan() {
   let loan_nft_policy_id = mock_policy_id(0)
   let protocol_parameters_script_hash = mock_script_hash(1)
   let oracle_script_hash = mock_script_hash(4)
+  let liquidated_funds_collector_script_hash = mock_script_hash(5)
+  let collateral_input_utxo_ref = mock_utxo_ref(0, 1)
 
   let (collateral_datum, collateral_input) = get_collateral_details()
 
@@ -163,9 +200,10 @@ test test_refund_loan() {
   collateral_validator.spend(
     protocol_parameters_script_hash,
     oracle_script_hash,
+    liquidated_funds_collector_script_hash,
     Some(collateral_datum),
     Refund,
-    mock_utxo_ref(0, 8),
+    collateral_input_utxo_ref,
     tx,
   )
 }
@@ -173,8 +211,22 @@ test test_refund_loan() {
 test test_liquidate_loan_with_loan_term_end() {
   let protocol_parameters_script_hash = mock_script_hash(1)
   let oracle_script_hash = mock_script_hash(4)
+  let liquidated_funds_collector_script_hash = mock_script_hash(5)
+  let collateral_input_utxo_ref = mock_utxo_ref(0, 1)
+  let collateral_amount_in_lovelace = 15000000
 
   let (collateral_datum, collateral_input) = get_collateral_details()
+
+  let collector_output =
+    Output {
+      address: Address {
+        payment_credential: Script(liquidated_funds_collector_script_hash),
+        stake_credential: None,
+      },
+      value: from_lovelace(collateral_amount_in_lovelace),
+      datum: NoDatum,
+      reference_script: None,
+    }
 
   let validity_range: ValidityRange =
     Interval {
@@ -192,15 +244,17 @@ test test_liquidate_loan_with_loan_term_end() {
     Transaction {
       ..placeholder,
       inputs: [collateral_input],
+      outputs: [collector_output],
       validity_range: validity_range,
     }
 
   collateral_validator.spend(
     protocol_parameters_script_hash,
     oracle_script_hash,
+    liquidated_funds_collector_script_hash,
     Some(collateral_datum),
     Liquidate,
-    mock_utxo_ref(0, 10),
+    collateral_input_utxo_ref,
     tx,
   )
 }
@@ -208,6 +262,9 @@ test test_liquidate_loan_with_loan_term_end() {
 test test_liquidate_loan_with_liquidation_threshold_reached() {
   let protocol_parameters_script_hash = mock_script_hash(1)
   let oracle_script_hash = mock_script_hash(4)
+  let liquidated_funds_collector_script_hash = mock_script_hash(5)
+  let collateral_input_utxo_ref = mock_utxo_ref(0, 1)
+  let collateral_amount_in_lovelace = 15000000
 
   let (collateral_datum, collateral_input) = get_collateral_details()
 
@@ -255,19 +312,32 @@ test test_liquidate_loan_with_liquidation_threshold_reached() {
       },
     }
 
+  let collector_output =
+    Output {
+      address: Address {
+        payment_credential: Script(liquidated_funds_collector_script_hash),
+        stake_credential: None,
+      },
+      value: from_lovelace(collateral_amount_in_lovelace),
+      datum: NoDatum,
+      reference_script: None,
+    }
+
   let tx =
     Transaction {
       ..placeholder,
       inputs: [collateral_input],
+      outputs: [collector_output],
       reference_inputs: [protocol_parameters_ref, oracle_ref],
     }
 
   collateral_validator.spend(
     protocol_parameters_script_hash,
     oracle_script_hash,
+    liquidated_funds_collector_script_hash,
     Some(collateral_datum),
     Liquidate,
-    mock_utxo_ref(0, 12),
+    collateral_input_utxo_ref,
     tx,
   )
 }

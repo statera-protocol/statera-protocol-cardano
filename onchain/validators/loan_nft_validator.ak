@@ -27,7 +27,7 @@ pub type Action {
   Burn
 }
 
-validator loan_nft(
+validator loan_nft_validator(
   borrow_utxo: OutputReference,
   collateral_validator_hash: ScriptHash,
   protocol_parameters_hash: ScriptHash,
@@ -104,6 +104,10 @@ fn validate_mint_borrow_nft(
   expect [Pair(nft_asset_name, nft_quantity)] =
     mint |> assets.tokens(policy_id) |> dict.to_pairs
 
+  expect [Pair(_, mint_loan_quantity)] =
+    mint |> assets.tokens(tusd_policy_id) |> dict.to_pairs
+  let is_loan_mint_quantity_valid = mint_loan_quantity == tusd_borrowed
+
   expect Some(oracle_ref) = find_input_by_hash(reference_inputs, oracle_hash)
 
   expect Some(borrow_input) = find_input(inputs, borrow_utxo)
@@ -157,6 +161,7 @@ fn validate_mint_borrow_nft(
       loan_term,
       validity_range,
     )?,
+    is_loan_mint_quantity_valid?,
     is_borrow_input_to_collateral_validator?,
     is_tsud_borrowed_valid_in_datum?,
     loan_nft_pid_valid_in_datum?,
@@ -208,9 +213,9 @@ fn validate_protocol_parameters(
 
   let is_loan_amount_valid = borrow_output_usd >= min_loan_amount
 
-  let borrower_loan_term = get_borrower_loan_term(borrower_provided_loan_term, validity_range)
-  let is_loan_term_valid =
-    borrower_loan_term <= loan_term
+  let borrower_loan_term =
+    get_borrower_loan_term(borrower_provided_loan_term, validity_range)
+  let is_loan_term_valid = borrower_loan_term <= loan_term
   trace @"borrower_provided_loan_term": borrower_provided_loan_term
   trace @"borrower loan term": borrower_loan_term
   trace @"param loan_term": loan_term
@@ -237,14 +242,8 @@ fn validate_burn_borrow_nft(
 
   expect InlineDatum(collateral_input_datum) = collateral_input.output.datum
 
-  expect CollateralDatum {
-    tusd_pool_hash,
-    tusd_policy_id,
-    tusd_asset_name,
-    tusd_borrowed,
-    loan_nft_pid,
-    ..
-  } = collateral_input_datum
+  expect CollateralDatum { tusd_policy_id, tusd_borrowed, loan_nft_pid, .. } =
+    collateral_input_datum
 
   expect [Pair(loan_nft_name, quantity)] =
     mint |> assets.tokens(loan_nft_pid) |> dict.to_pairs
@@ -259,19 +258,9 @@ fn validate_burn_borrow_nft(
 
   let is_loan_nft_burned = quantity == -1
 
-  let is_refund_amount_going_to_right_pool =
-    outputs
-      |> list.any(
-          fn(output) {
-            and {
-              Script(tusd_pool_hash) == output.address.payment_credential,
-              (
-                output.value
-                  |> quantity_of(tusd_policy_id, tusd_asset_name)
-              ) == tusd_borrowed,
-            }
-          },
-        )
+  expect [Pair(_, refund_mint_quantity)] =
+    mint |> assets.tokens(tusd_policy_id) |> dict.to_pairs
+  let is_refund_amount_burned = refund_mint_quantity == -tusd_borrowed
 
   let is_collateral_going_back_to_refunder =
     outputs
@@ -286,7 +275,7 @@ fn validate_burn_borrow_nft(
 
   and {
     is_loan_nft_burned?,
-    is_refund_amount_going_to_right_pool?,
+    is_refund_amount_burned?,
     is_collateral_going_back_to_refunder?,
   }
 }
@@ -341,7 +330,7 @@ test test_borrow_with_right_values() {
   let loan_nft_policy_id = mock_policy_id(1)
   let collateral_validator_script_hash = mock_script_hash(2)
   let test_usd_pool_hash = mock_script_hash(3)
-  let test_usd_policy_id = mock_policy_id(0)
+  let test_usd_policy_id = mock_policy_id(9)
   let test_usd_asset_name = "tUSD"
   let collateral_amount_in_lovelace = 15000000
   let collateral_validator_output =
@@ -404,48 +393,14 @@ test test_borrow_with_right_values() {
       reference_script: None,
     }
 
-  // Remove
-  let liquidity_input =
-    Input {
-      output_reference: mock_utxo_ref(0, 7),
-      output: Output {
-        address: Address {
-          payment_credential: Script(test_usd_pool_hash),
-          stake_credential: None,
-        },
-        value: from_asset(test_usd_policy_id, test_usd_asset_name, 10),
-        datum: NoDatum,
-        reference_script: None,
-      },
-    }
-  let liquidity_input2 =
-    Input {
-      output_reference: mock_utxo_ref(0, 7),
-      output: Output {
-        address: Address {
-          payment_credential: Script(test_usd_pool_hash),
-          stake_credential: None,
-        },
-        value: from_asset(test_usd_policy_id, test_usd_asset_name, 25),
-        datum: NoDatum,
-        reference_script: None,
-      },
-    }
-
   let mint =
-    from_asset_list([Pair(loan_nft_policy_id, [Pair("BorrowNFT1", 1)])])
+    from_asset_list(
+      [
+        Pair(loan_nft_policy_id, [Pair("BorrowNFT1", 1)]),
+        Pair(test_usd_policy_id, [Pair("tUSD", 12)]),
+      ],
+    )
 
-  // let validity_range: ValidityRange =
-  //   Interval {
-  //     lower_bound: IntervalBound {
-  //       bound_type: NegativeInfinity,
-  //       is_inclusive: True,
-  //     },
-  //     upper_bound: IntervalBound {
-  //       bound_type: Finite(finite_time_now),
-  //       is_inclusive: False,
-  //     },
-  //   }
   let validity_range: ValidityRange =
     Interval {
       lower_bound: IntervalBound {
@@ -461,14 +416,14 @@ test test_borrow_with_right_values() {
   let tx =
     Transaction {
       ..placeholder,
-      inputs: [borrow_input, liquidity_input, liquidity_input2],
+      inputs: [borrow_input],
       outputs: [collateral_validator_output, borrow_output],
       reference_inputs: [protocol_parameters_ref, oracle_ref],
       mint: mint,
       validity_range: validity_range,
     }
 
-  loan_nft.mint(
+  loan_nft_validator.mint(
     borrow_outref,
     collateral_validator_script_hash,
     protocol_parameters_script_hash,
@@ -487,7 +442,7 @@ test test_repay_loan_burn_nft_with_right_values() {
 
   let collateral_validator_script_hash = mock_script_hash(2)
   let tusd_pool_script_hash = mock_script_hash(3)
-  let test_usd_policy_id = mock_policy_id(0)
+  let test_usd_policy_id = mock_policy_id(9)
   let test_usd_asset_name = "tUSD"
   let collateral_amount_in_lovelace = 15000000
   let collateral_input =
@@ -573,7 +528,10 @@ test test_repay_loan_burn_nft_with_right_values() {
     }
 
   let mint =
-    from_asset_list([Pair(loan_nft_policy_id, [Pair("BorrowNFT1", -1)])])
+    assets.merge(
+      from_asset(loan_nft_policy_id, "BorrowNFT1", -1),
+      from_asset(test_usd_policy_id, "tUSD", -12),
+    )
 
   let tx =
     Transaction {
@@ -583,7 +541,7 @@ test test_repay_loan_burn_nft_with_right_values() {
       mint: mint,
     }
 
-  loan_nft.mint(
+  loan_nft_validator.mint(
     borrow_outref,
     collateral_validator_script_hash,
     protocol_parameters_script_hash,
