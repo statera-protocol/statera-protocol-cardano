@@ -1,21 +1,20 @@
 use aiken/collection/dict
 use aiken/collection/list
 use aiken/crypto.{ScriptHash}
-use aiken/interval.{Finite, Interval, IntervalBound, PositiveInfinity}
 use cardano/address.{Address, Script}
 use cardano/assets.{
   PolicyId, Value, from_asset, from_asset_list, from_lovelace, lovelace_of,
   quantity_of,
 }
 use cardano/transaction.{
-  InlineDatum, Input, NoDatum, Output, OutputReference, Transaction,
-  ValidityRange, find_input, placeholder,
+  InlineDatum, Input, NoDatum, Output, OutputReference, Transaction, find_input,
+  placeholder,
 }
 use halalend/constants.{usd_with_lovelace_precision_factor}
 use halalend/datums.{CollateralDatum, ProtocolParametersDatum}
 use halalend/utils.{
   calculate_by_percentage, find_input_by_hash, find_output_by_hash,
-  get_borrower_loan_term, validate_pool_hash,
+  validate_pool_hash,
 }
 use mocktail/virgin_key_hash.{
   mock_policy_id, mock_pub_key_hash, mock_script_hash,
@@ -34,14 +33,7 @@ validator loan_nft_validator(
   oracle_hash: ScriptHash,
 ) {
   mint(redeemer: Action, policy_id: PolicyId, self: Transaction) {
-    let Transaction {
-      inputs,
-      outputs,
-      mint,
-      reference_inputs,
-      validity_range,
-      ..
-    } = self
+    let Transaction { inputs, outputs, mint, reference_inputs, .. } = self
 
     when redeemer is {
       Mint ->
@@ -55,7 +47,6 @@ validator loan_nft_validator(
           reference_inputs,
           outputs,
           borrow_utxo,
-          validity_range,
         )
       Burn ->
         validate_burn_borrow_nft(
@@ -82,7 +73,6 @@ fn validate_mint_borrow_nft(
   reference_inputs: List<Input>,
   outputs: List<Output>,
   borrow_utxo: OutputReference,
-  validity_range: ValidityRange,
 ) {
   expect Some(collateral_output) =
     find_output_by_hash(outputs, collateral_validator_hash)
@@ -98,7 +88,6 @@ fn validate_mint_borrow_nft(
     collateral_rate_in_lovelace,
     collateral_asset,
     collateral_amount_in_lovelace,
-    loan_term,
   } = collateral_output_datum
 
   expect [Pair(nft_asset_name, nft_quantity)] =
@@ -158,8 +147,6 @@ fn validate_mint_borrow_nft(
       borrow_output_usd,
       oracle_lovelace_usd_rate,
       collateral_asset,
-      loan_term,
-      validity_range,
     )?,
     is_loan_mint_quantity_valid?,
     is_borrow_input_to_collateral_validator?,
@@ -179,8 +166,6 @@ fn validate_protocol_parameters(
   borrow_output_usd: Int,
   oracle_lovelace_usd_rate: Int,
   collateral_asset: ByteArray,
-  borrower_provided_loan_term: Int,
-  validity_range: ValidityRange,
 ) {
   expect Some(protocol_parameters_ref) =
     find_input_by_hash(reference_inputs, protocol_parameters_hash)
@@ -192,7 +177,6 @@ fn validate_protocol_parameters(
     min_collateral_ratio,
     min_loan_amount,
     collateral_assets,
-    loan_term,
     ..
   } = protocol_parameters_datum
 
@@ -213,20 +197,12 @@ fn validate_protocol_parameters(
 
   let is_loan_amount_valid = borrow_output_usd >= min_loan_amount
 
-  let borrower_loan_term =
-    get_borrower_loan_term(borrower_provided_loan_term, validity_range)
-  let is_loan_term_valid = borrower_loan_term <= loan_term
-  trace @"borrower_provided_loan_term": borrower_provided_loan_term
-  trace @"borrower loan term": borrower_loan_term
-  trace @"param loan_term": loan_term
-
   let is_collateral_asset = list.has(collateral_assets, collateral_asset)
 
   and {
     is_rate_and_mcr_valid?,
     is_rate_in_datum_valid?,
     is_loan_amount_valid?,
-    is_loan_term_valid?,
     is_collateral_asset?,
   }
 }
@@ -282,8 +258,6 @@ fn validate_burn_borrow_nft(
 
 // Tests
 test test_borrow_with_right_values() {
-  let finite_time_now = 86_400 * 1000
-
   let borrow_outref = mock_utxo_ref(0, 0)
   let borrow_key_hash = mock_pub_key_hash(0)
   // 15 ADA with 150% MCR @ 1.2$ per ADA so allowed to borrow $12
@@ -320,7 +294,6 @@ test test_borrow_with_right_values() {
             min_loan_amount: 10,
             protocol_usage_fee: 2,
             collateral_assets: ["ada", "iUSD", "halalend", "hosky"],
-            loan_term: 14 * 24 * 60 * 60 * 1000,
           },
         ),
         reference_script: None,
@@ -351,7 +324,6 @@ test test_borrow_with_right_values() {
           collateral_rate_in_lovelace: 1200000,
           collateral_asset: "ada",
           collateral_amount_in_lovelace,
-          loan_term: 7 * 24 * 60 * 60 * 1000 + finite_time_now,
         },
       ),
       reference_script: None,
@@ -401,18 +373,6 @@ test test_borrow_with_right_values() {
       ],
     )
 
-  let validity_range: ValidityRange =
-    Interval {
-      lower_bound: IntervalBound {
-        bound_type: Finite(finite_time_now),
-        is_inclusive: True,
-      },
-      upper_bound: IntervalBound {
-        bound_type: PositiveInfinity,
-        is_inclusive: False,
-      },
-    }
-
   let tx =
     Transaction {
       ..placeholder,
@@ -420,7 +380,6 @@ test test_borrow_with_right_values() {
       outputs: [collateral_validator_output, borrow_output],
       reference_inputs: [protocol_parameters_ref, oracle_ref],
       mint: mint,
-      validity_range: validity_range,
     }
 
   loan_nft_validator.mint(
@@ -465,7 +424,6 @@ test test_repay_loan_burn_nft_with_right_values() {
             collateral_rate_in_lovelace: 1200000,
             collateral_asset: "ada",
             collateral_amount_in_lovelace,
-            loan_term: 14 * 24 * 60 * 60 * 1000,
           },
         ),
         reference_script: None,

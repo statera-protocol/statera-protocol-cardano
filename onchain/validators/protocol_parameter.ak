@@ -43,7 +43,6 @@ test test_spend_protocol_parameter_validator_utxo() {
       min_loan_amount: 100,
       protocol_usage_fee: 5,
       collateral_assets: ["ada", "iUSD", "halalend", "hosky"],
-      loan_term: 14 * 24 * 60 * 60 * 1000,
     }
   // 14 days in milliseconds
   let redeemer = ""

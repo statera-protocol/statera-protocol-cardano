@@ -7,7 +7,6 @@ pub type ProtocolParametersDatum {
   min_loan_amount: Int,
   protocol_usage_fee: Int,
   collateral_assets: List<ByteArray>,
-  loan_term: Int,
 }
 
 pub type CollateralDatum {
@@ -19,5 +18,4 @@ pub type CollateralDatum {
   collateral_rate_in_lovelace: Int,
   collateral_asset: ByteArray,
   collateral_amount_in_lovelace: Int,
-  loan_term: Int,
 }
