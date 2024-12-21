@@ -1,13 +1,15 @@
-import { BuiltinByteString, ConStr0, deserializeDatum, Integer, mConStr0, mConStr1 } from "@meshsdk/core";
-import { blockchainProvider, txBuilder, wallet1, wallet1Address, wallet1Collateral, wallet1Utxos } from "../setup.js";
-import { collateralValidatorAddress, collateralValidatorScript, liquidityPoolValidatorAddress, loanNftValidatorScript, oracleUtxo, protocolParametersUtxo, tUSDUnit } from "./setup.js";
+import { BuiltinByteString, conStr, conStr0, ConStr0, deserializeDatum, Integer, mConStr0, mConStr1 } from "@meshsdk/core";
+import { blockchainProvider, multiSigAddress, txBuilder, wallet1, wallet1Address, wallet1Collateral, wallet1Utxos } from "../setup.js";
+import { collateralValidatorAddress, collateralValidatorScript, loanNftValidatorScript, oracleUtxo, protocolParametersUtxo, mintLoanUnit, mintLoanValidatorScript, mintLoanPolicyId, mintLoanAssetNameHex } from "./setup.js";
 
 if (!oracleUtxo) {
     throw new Error('Oracle UTxO not found!');
 }
 
+// TODO: In off-chain, get the policy id of NFT, use maestro to search for the NFT, and NFT tx,
+//   Or get it directly from the NFT Utxos listed in the DApp
 const loanNftUtxo = (await blockchainProvider.fetchUTxOs(
-    '89e6831cf70a801147c333fb69fae2aee4d5fe80cc4785dedaa541b9432f3659',
+    '97ebe981672be1c2a2339aab5400d4c620994db97e6787d075db5724757906e0',
     1
 ))[0];
 const loanNftUtxoAmountUnits = loanNftUtxo.output.amount.map((amount) => amount.unit);
@@ -48,14 +50,22 @@ const collateralUtxo = collateralUtxos.find(utxo => {
 if (!collateralUtxo) {
     throw new Error('No collateral Utxo found for the NFT');
 }
+console.log('collateral utxo:', collateralUtxo);
+
+const collateralAdaAsset = collateralUtxo.output.amount.find((asset) =>
+    asset.unit == "lovelace"
+)
+if (!collateralAdaAsset) {
+    throw new Error('collateral Ada Asset not found');
+}
 
 const unsignedTx = await txBuilder
-    .txIn(
-        loanNftUtxo.input.txHash,
-        loanNftUtxo.input.outputIndex,
-        loanNftUtxo.output.amount,
-        loanNftUtxo.output.address,
-    )
+    // .txIn(
+    //     loanNftUtxo.input.txHash,
+    //     loanNftUtxo.input.outputIndex,
+    //     loanNftUtxo.output.amount,
+    //     loanNftUtxo.output.address,
+    // )
     .spendingPlutusScriptV3()
     .txIn(
         collateralUtxo.input.txHash,
@@ -65,16 +75,21 @@ const unsignedTx = await txBuilder
     )
     .txInScript(collateralValidatorScript)
     .spendingReferenceTxInInlineDatumPresent()
-    .spendingReferenceTxInRedeemerValue(mConStr0([]))
+    // .spendingReferenceTxInRedeemerValue(mConStr0([]), undefined, { mem: 70000, steps: 21000000 })
+    .spendingReferenceTxInRedeemerValue(mConStr0([]), undefined, { mem: 2100000, steps: 700000000 })
     .mintPlutusScriptV3()
     .mint("-1", userLoanNFTUnit.slice(0, 56), userLoanNFTUnit.slice(56))
     .mintingScript(loanNftValidatorScript)
-    .mintRedeemerValue(mConStr1([]))
-    // will fail, replace with String(userLoanAmount)
-    .txOut(liquidityPoolValidatorAddress, [ { unit: tUSDUnit, quantity: String(userLoanAmount) } ])
+    // .mintRedeemerValue(mConStr1([]), undefined, { mem: 100000, steps: 29000000 })
+    .mintRedeemerValue(mConStr1([]), undefined, { mem: 2100000, steps: 700000000 })
+    .mintPlutusScriptV3()
+    .mint("-".concat(String(userLoanAmount)), mintLoanPolicyId, mintLoanAssetNameHex)
+    .mintingScript(mintLoanValidatorScript)
+    .mintRedeemerValue(mConStr1([]), undefined, { mem: 2100000, steps: 700000000 })
     .txOut(wallet1Address, collateralUtxo.output.amount)
-    .readOnlyTxInReference(oracleUtxo.input.txHash, oracleUtxo.input.outputIndex)
-    .readOnlyTxInReference(protocolParametersUtxo.input.txHash, protocolParametersUtxo.input.outputIndex)
+    // .txOut(wallet1Address, [{ unit: "lovelace", quantity: collateralAdaAsset.quantity }])
+    // .readOnlyTxInReference(oracleUtxo.input.txHash, oracleUtxo.input.outputIndex)
+    // .readOnlyTxInReference(protocolParametersUtxo.input.txHash, protocolParametersUtxo.input.outputIndex)
     .txInCollateral(
         wallet1Collateral.input.txHash,
         wallet1Collateral.input.outputIndex,
@@ -86,6 +101,8 @@ const unsignedTx = await txBuilder
     .complete()
 
 const signedTx = await wallet1.signTx(unsignedTx);
+// const evaluateTx = await blockchainProvider.evaluateTx(signedTx);
+// console.log('evaluate tx:', evaluateTx);
 const txHash = await wallet1.submitTx(signedTx);
 
 console.log('Repayment tx hash:', txHash);

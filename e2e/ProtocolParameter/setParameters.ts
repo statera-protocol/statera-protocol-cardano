@@ -8,7 +8,6 @@ const ProtocolParametersDatum = mConStr0([
     100,
     5,
     ["ada", "iUSD", "halalend", "hosky"],
-    14 * 24 * 60 * 60 * 1000,
 ]);
 
 const unsignedTx = await txBuilder

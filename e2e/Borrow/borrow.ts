@@ -1,6 +1,7 @@
 import { BuiltinByteString, ConStr0, DatumSource, Integer, mConStr0, SLOT_CONFIG_NETWORK, stringToHex, unixTimeToEnclosingSlot } from "@meshsdk/core";
-import { blockchainProvider, maestroKey, txBuilder, wallet1, wallet1Address, wallet1Collateral, wallet1Passphrase, wallet1Utxos } from "../setup.js";
-import { aBorrowInput, collateralValidatorAddress, collateralValidatorScriptHash, liquidityPoolInput, liquidityPoolScriptHash, liquidityPoolValidatorAddress, liquidityPoolValidatorCode, liquidityPoolValidatorScript, loanNftPolicyId, loanNftValidatorCode, loanNftValidatorScript, oracleAddress, oracleUtxo, protocolParametersAddress, protocolParametersScriptHash, protocolParametersUtxo, tUsdAssetNameHex, tUsdPolicyId, tUSDUnit } from "./setup.js";
+import { blockchainProvider, txBuilder, wallet1, wallet1Address, wallet1Collateral, wallet1Passphrase, wallet1Utxos } from "../setup.js";
+// import { blockchainProvider, maestroKey, txBuilder, wallet1, wallet1Address, wallet1Collateral, wallet1Passphrase, wallet1Utxos } from "../setup.js";
+import { aBorrowInput, collateralValidatorAddress, collateralValidatorScriptHash, loanNftPolicyId, loanNftValidatorCode, loanNftValidatorScript, oracleAddress, oracleUtxo, protocolParametersAddress, protocolParametersScriptHash, protocolParametersUtxo, mintLoanAssetNameHex, mintLoanPolicyId, mintLoanUnit, mintLoanValidatorScript } from "./setup.js";
 import { calculateLoanAmount } from "./util.js";
 // import { applyDoubleCborEncoding, applyParamsToScript, Constr, Data, fromText, Lucid, Maestro, MintingPolicy, SpendingValidator } from "@lucid-evolution/lucid";
 
@@ -11,52 +12,29 @@ if (!protocolParametersUtxo) {
     throw new Error('Protocol Parameters UTxO not found!');
 }
 
-const loanNftName = "HalalendBorrow-Liquidate-Test";
+// const loanNftName = "HB-New-Model";
+const loanNftName = "HB-New-Model-Liquidation";
 const loanNftNameHex = stringToHex(loanNftName);
 const loanNftUnit = loanNftPolicyId + loanNftNameHex;
 
-const collateralAmmountInLovelaces = "150000000"; // 150 ADA
+const collateralAmmountInLovelaces = "300000000"; // 300 ADA
 const [oracleRate, loanAmount] = calculateLoanAmount(
     oracleUtxo?.output.amount,
     protocolParametersUtxo.output.plutusData,
     collateralAmmountInLovelaces,
 );
 
-// console.log(oracleRate, loanAmount);
-
-// In a more complex solution compound all the inputs needed to cover the loan amount
-//  from the pool, aggregate the value and use to calculate this below
-const liquidtyBalance = Number(liquidityPoolInput.output.amount[1].quantity) - loanAmount;
-
-// const loan_term = 2 * 24 * 60 * 60 * 1000;
-const loan_term = 5 * 60 * 1000;
-
-// const currentDateTime = (Date.now() - 60000);
-const currentDateTime = (Date.now() - 80000);
-
-const invalidBefore = unixTimeToEnclosingSlot(
-    currentDateTime,
-    SLOT_CONFIG_NETWORK.preprod,
-);
-
-console.log('invalidBefore:', invalidBefore);
-
-console.log('currentDateTime:', currentDateTime);
-// // 1734042497097 - currentDateTime in off chain code
-// // 1669925588000 - currentDateTime in Aiken chain code
-// // 64289709097 - Borrower loan term in Datum minus currentDateTime in Aiken code
-// // 1209600000 - loan_term in protocol parameters
+console.log('loanAmount:', loanAmount);
 
 const collateralDatum = mConStr0([
-    liquidityPoolScriptHash,
-    tUsdPolicyId,
-    tUsdAssetNameHex,
+    mintLoanPolicyId,
+    mintLoanPolicyId,
+    mintLoanAssetNameHex,
     loanAmount,
     loanNftPolicyId,
     (oracleRate * 1000000), // USD multiplied by ADA lovelaces bcs no decimals in blockhain
     "ada",
     Number(collateralAmmountInLovelaces),
-    (currentDateTime + loan_term)
 ]);
 
 const unsignedTx = await txBuilder
@@ -66,24 +44,17 @@ const unsignedTx = await txBuilder
         aBorrowInput.output.amount,
         aBorrowInput.output.address,
     )
-    .spendingPlutusScriptV3()
-    .txIn(
-        liquidityPoolInput.input.txHash,
-        liquidityPoolInput.input.outputIndex,
-        liquidityPoolInput.output.amount,
-        liquidityPoolInput.output.address,
-    )
-    .txInScript(liquidityPoolValidatorScript)
-    .spendingReferenceTxInInlineDatumPresent()
-    .spendingReferenceTxInRedeemerValue("")
     .mintPlutusScriptV3()
     .mint("1", loanNftPolicyId, loanNftNameHex)
     .mintingScript(loanNftValidatorScript)
     .mintRedeemerValue(mConStr0([]))
+    .mintPlutusScriptV3()
+    .mint(String(loanAmount), mintLoanPolicyId, mintLoanAssetNameHex)
+    .mintingScript(mintLoanValidatorScript)
+    .mintRedeemerValue(mConStr0([]))
     .txOut(collateralValidatorAddress, [ { unit: "lovelace", quantity: collateralAmmountInLovelaces } ])
     .txOutInlineDatumValue(collateralDatum)
-    .txOut(wallet1Address, [ { unit: loanNftUnit, quantity: "1" }, { unit: tUSDUnit, quantity: String(loanAmount) }])
-    .txOut(liquidityPoolValidatorAddress, [ { unit: tUSDUnit, quantity: String(liquidtyBalance) } ] )
+    .txOut(wallet1Address, [ { unit: loanNftUnit, quantity: "1" }, { unit: mintLoanUnit, quantity: String(loanAmount) }])
     .readOnlyTxInReference(oracleUtxo.input.txHash, oracleUtxo.input.outputIndex)
     .readOnlyTxInReference(protocolParametersUtxo.input.txHash, protocolParametersUtxo.input.outputIndex)
     .txInCollateral(
@@ -92,7 +63,6 @@ const unsignedTx = await txBuilder
         wallet1Collateral.output.amount,
         wallet1Collateral.output.address,
     )
-    .invalidBefore(invalidBefore)
     .changeAddress(wallet1Address)
     .selectUtxosFrom(wallet1Utxos)
     .complete()
@@ -100,7 +70,7 @@ const unsignedTx = await txBuilder
 const signedTx = await wallet1.signTx(unsignedTx);
 const txHash = await wallet1.submitTx(signedTx);
 
-console.log('Genesis Halalend Borrow tx Hash:', txHash);
+console.log('New Halalend Model Borrow tx Hash:', txHash);
 
 // Trying out lucid tx
 // if (!maestroKey) {

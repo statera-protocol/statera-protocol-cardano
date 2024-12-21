@@ -4,12 +4,13 @@ import {
     MeshTxBuilder,
     MeshWallet,
     deserializeAddress,
+    serializeNativeScript,
 } from "@meshsdk/core";
-import { UTxO } from "@meshsdk/common";
+import { NativeScript, UTxO } from "@meshsdk/common";
 import dotenv from "dotenv";
 dotenv.config();
 import blueprint from "../onchain/plutus.json" with { type: "json" };
-import { OfflineEvaluator } from "@meshsdk/core-csl";
+import { OfflineEvaluator, resolveNativeScriptHash } from "@meshsdk/core-csl";
 
 // Setup blockhain provider as Maestro
 const maestroKey = process.env.MAESTRO_KEY;
@@ -53,13 +54,47 @@ if (!wallet1Collateral) {
 
 const { pubKeyHash: wallet1VK } = deserializeAddress(wallet1Address);
 
+// Setup wallet2
+const wallet2Passphrase = process.env.WALLET_PASSPHRASE_TWO;
+if (!wallet2Passphrase) {
+    throw new Error("WALLET_PASSPHRASE_TWO does not exist");
+}
+const wallet2 = new MeshWallet({
+    networkId: 0,
+    fetcher: blockchainProvider,
+    submitter: blockchainProvider,
+    key: {
+        type: "mnemonic",
+        words: wallet2Passphrase.split(' ')
+    },
+});
+const wallet2Address = await wallet1.getChangeAddress();
+const { pubKeyHash: wallet2VK } = deserializeAddress(wallet2Address);
+
+// Setup multisig
+const nativeScript: NativeScript = {
+    type: "all",
+    scripts: [
+        {
+            type: "sig",
+            keyHash: wallet1VK,
+        },
+        {
+            type: "sig",
+            keyHash: wallet2VK,
+        },
+    ],
+};
+const { address: multiSigAddress, scriptCbor: multiSigCbor } = serializeNativeScript(nativeScript);
+const multisigHash = resolveNativeScriptHash(nativeScript);
+
 // Evaluator for Aiken verbose mode
-// const evaluator = new OfflineEvaluator(blockchainProvider, "preprod");
+const evaluator = new OfflineEvaluator(blockchainProvider, "preprod");
 // Create transaction builder
 const txBuilder = new MeshTxBuilder({
     fetcher: blockchainProvider,
     submitter: blockchainProvider,
-    // evaluator: evaluator,
+    evaluator: evaluator,
     verbose: false,
 });
 txBuilder.setNetwork('preprod');
@@ -75,4 +110,7 @@ export {
     wallet1VK,
     wallet1Utxos,
     wallet1Collateral,
+    wallet2,
+    multisigHash,
+    multiSigAddress,
 }

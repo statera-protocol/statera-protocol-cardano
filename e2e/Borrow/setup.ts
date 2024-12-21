@@ -1,5 +1,5 @@
-import { applyCborEncoding, applyParamsToScript, builtinByteString, outputReference, resolveScriptHash, serializePlutusScript } from "@meshsdk/core";
-import { blockchainProvider, blueprint, wallet1Utxos } from "../setup.js";
+import { applyCborEncoding, applyParamsToScript, builtinByteString, integer, outputReference, resolveScriptHash, serializePlutusScript, stringToHex } from "@meshsdk/core";
+import { blockchainProvider, blueprint, multisigHash, wallet1Utxos } from "../setup.js";
 import { parameterizedScript as protocolParametersScript, scriptAddr as protocolParametersAddress } from "../ProtocolParameter/validator.js";
 
 // Oracle
@@ -8,26 +8,11 @@ const oracleScriptHash = resolveScriptHash(oracleScript, "V3");
 const oracleAddress = serializePlutusScript(
     { code: oracleScript, version: "V3" }
 ).address;
-const tUsdPolicyId = "b2af4d6208ee4114c74dc01b7111ba1df61a94a2d7d2fd7c473b139f";
-const tUsdAssetNameHex = "74555344";
-const tUSDUnit = tUsdPolicyId + tUsdAssetNameHex;
-const oracleAddressUtxos = await blockchainProvider.fetchAddressUTxOs(oracleAddress);
-const oracleUtxo  = oracleAddressUtxos.find((utxo) => (
-    (utxo.output.amount.length > 1)
-    ? (utxo.output.amount[1].unit == tUSDUnit && utxo.output.amount[1].quantity == "24")
-    : false
-));
-const oracleUtxoForLiquidation  = oracleAddressUtxos.find((utxo) => (
-    (utxo.output.amount.length > 1)
-    ? (utxo.output.amount[1].unit == tUSDUnit && utxo.output.amount[1].quantity == "12")
-    : false
-));
-console.log(oracleUtxoForLiquidation);
-console.log(oracleUtxoForLiquidation?.output.amount);
 
 // Protocol parameters
 const protocolParametersAddressUtxos = await blockchainProvider.fetchAddressUTxOs(protocolParametersAddress);
-const protocolParametersUtxo = protocolParametersAddressUtxos[0];
+console.log('protocol parameters utxo:', protocolParametersAddressUtxos);
+const protocolParametersUtxo = protocolParametersAddressUtxos[1];
 const protocolParametersScriptHash = resolveScriptHash(protocolParametersScript, "V3");
 
 // Collateral validator
@@ -37,7 +22,11 @@ if (!collateralValidatorCode) {
 }
 const collateralValidatorScript = applyParamsToScript(
     collateralValidatorCode[0].compiledCode,
-    [builtinByteString(protocolParametersScriptHash), builtinByteString(oracleScriptHash)],
+    [
+        builtinByteString(protocolParametersScriptHash),
+        builtinByteString(oracleScriptHash),
+        builtinByteString(multisigHash),
+    ],
     "JSON"
 );
 const collateralValidatorAddress = serializePlutusScript(
@@ -45,31 +34,52 @@ const collateralValidatorAddress = serializePlutusScript(
 ).address;
 const collateralValidatorScriptHash = resolveScriptHash(collateralValidatorScript, "V3");
 
-// Liquidity pool validator
-const liquidityPoolValidatorCode = blueprint.validators.filter((val) => val.title.includes('liquidity_pool.spend'));
-if (!liquidityPoolValidatorCode) {
-    throw new Error('Liquidity Pool Validator not found!');
+// Mint loan validator
+const mintLoanValidatorCode = blueprint.validators.filter((val) => val.title.includes('mint_loan_validator.mint'));
+if (!mintLoanValidatorCode) {
+    throw new Error('Mint loan Validator not found!');
 }
-const liquidityPoolValidatorScript = applyParamsToScript(
-    liquidityPoolValidatorCode[0].compiledCode,
+const mintLoanValidatorScript = applyParamsToScript(
+    mintLoanValidatorCode[0].compiledCode,
     [builtinByteString(collateralValidatorScriptHash)],
     "JSON"
 );
-const liquidityPoolValidatorAddress = serializePlutusScript(
-    { code: liquidityPoolValidatorScript, version: 'V3' },
+const mintLoanValidatorAddress = serializePlutusScript(
+    { code: mintLoanValidatorScript, version: 'V3' },
 ).address;
-const liquidityPoolScriptHash = resolveScriptHash(liquidityPoolValidatorScript, "V3");
+const mintLoanScriptHash = resolveScriptHash(mintLoanValidatorScript, "V3");
+const mintLoanPolicyId = mintLoanScriptHash;
+const mintLoanAssetNameHex = stringToHex("tUSD");
+const mintLoanUnit = mintLoanPolicyId + mintLoanAssetNameHex;
+
+// Oracle (contnd)
+const oracleAddressUtxos = await blockchainProvider.fetchAddressUTxOs(oracleAddress);
+const oracleUtxo  = oracleAddressUtxos.find((utxo) => (
+    (utxo.output.amount.length > 1)
+    ? (utxo.output.amount[1].unit == mintLoanUnit && utxo.output.amount[1].quantity == "24")
+    : false
+));
+const oracleUtxoForLiquidation  = oracleAddressUtxos.find((utxo) => (
+    (utxo.output.amount.length > 1)
+    ? (utxo.output.amount[1].unit == mintLoanUnit && utxo.output.amount[1].quantity == "12")
+    : false
+));
+// console.log('oracleUtxoForLiquidation:', oracleUtxo);
+// console.log('oracleUtxoForLiquidation?.output.amount:', oracleUtxo?.output.amount);
 
 // Loan NFT validator
-const loanNftValidatorCode = blueprint.validators.filter((val) => val.title.includes('loan_nft.mint'));
+const loanNftValidatorCode = blueprint.validators.filter((val) => val.title.includes('loan_nft_validator.mint'));
 if (!loanNftValidatorCode) {
     throw new Error('Loan NFT Validator not found!');
 }
+// TODO: aBorrowInput will be automatically selected in from the user's wallet
+//   search for an ada only utxo, if not available, use the next one with the lowest no. of assets
 const aBorrowInput = (await blockchainProvider.fetchUTxOs(
-    '6119b07097effc1520e0d5a096862600e81457b4c7c64b78532926034b22e1cd',
-    3,
+    '97ebe981672be1c2a2339aab5400d4c620994db97e6787d075db5724757906e0',
+    2,
 ))[0];
 const paramUtxo = outputReference(aBorrowInput.input.txHash, aBorrowInput.input.outputIndex);
+// TODO: Find a way to save this script or get it to reuse during repayment
 const loanNftValidatorScript = applyParamsToScript(
     loanNftValidatorCode[0].compiledCode,
     [
@@ -86,33 +96,30 @@ const loanNftValidatorAddress = serializePlutusScript(
 const loanNftPolicyId = resolveScriptHash(loanNftValidatorScript, "V3");
 
 // Utils
-const liquidityPoolUtxos = await blockchainProvider.fetchAddressUTxOs(liquidityPoolValidatorAddress);
-const liquidityPoolInput = liquidityPoolUtxos[0];
-// console.log('LIQUIDITY POOL UTXOS:', liquidityPoolUtxos);
-// console.log('liquidityPoolValidatorAddress:', liquidityPoolValidatorAddress);
-// console.log('liquidityPoolInput:', liquidityPoolInput);
+// console.log('LIQUIDITY POOL UTXOS:', mintLoanUtxos);
+// console.log('mintLoanValidatorAddress:', mintLoanValidatorAddress);
+// console.log('mintLoanInput:', mintLoanInput);
 // console.log('oracleUtxo:', oracleUtxo);
 // console.log('protocolParametersUtxo:', protocolParametersUtxo);
 
 export {
     aBorrowInput,
     oracleAddress,
-    liquidityPoolInput,
-    liquidityPoolValidatorScript,
-    liquidityPoolValidatorAddress,
-    liquidityPoolScriptHash,
+    mintLoanValidatorScript,
+    mintLoanValidatorAddress,
+    mintLoanScriptHash,
     loanNftPolicyId,
     loanNftValidatorScript,
     collateralValidatorAddress,
     collateralValidatorScript,
-    tUSDUnit,
-    tUsdPolicyId,
-    tUsdAssetNameHex,
+    mintLoanUnit,
+    mintLoanPolicyId,
+    mintLoanAssetNameHex,
     oracleUtxo,
     oracleUtxoForLiquidation,
     protocolParametersUtxo,
     // For lucid
-    liquidityPoolValidatorCode,
+    mintLoanValidatorCode,
     loanNftValidatorCode,
     protocolParametersAddress,
     collateralValidatorScriptHash,

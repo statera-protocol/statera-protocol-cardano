@@ -6,7 +6,7 @@ console.log('protocol paramters address', scriptAddr);
 
 const protocolParameterUtxos = await blockchainProvider.fetchAddressUTxOs(scriptAddr);
 console.log(protocolParameterUtxos, '\n');
-const protocolParameterUtxo = protocolParameterUtxos[0];
+const protocolParameterUtxo = protocolParameterUtxos[1];
 
 // throw error for an invalid utxo
 if (!protocolParameterUtxo) {
@@ -44,5 +44,4 @@ console.log(`
         min_loan_amount: ${Number(datum.fields[2].int)},
         protocol_usage_fee: ${Number(datum.fields[3].int)},
         collateral_assets: ${collateralAssets.join(", ")},
-        loan_term: ${datum.fields[5].int} milli seconds,
 `);
