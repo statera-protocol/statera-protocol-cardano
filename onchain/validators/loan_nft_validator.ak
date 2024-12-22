@@ -14,7 +14,6 @@ use halalend/constants.{usd_with_lovelace_precision_factor}
 use halalend/datums.{CollateralDatum, ProtocolParametersDatum}
 use halalend/utils.{
   calculate_by_percentage, find_input_by_hash, find_output_by_hash,
-  validate_pool_hash,
 }
 use mocktail/virgin_key_hash.{
   mock_policy_id, mock_pub_key_hash, mock_script_hash,
@@ -80,7 +79,6 @@ fn validate_mint_borrow_nft(
   expect InlineDatum(collateral_output_datum) = collateral_output.datum
 
   expect CollateralDatum {
-    tusd_pool_hash,
     tusd_policy_id,
     tusd_asset_name,
     tusd_borrowed,
@@ -88,6 +86,7 @@ fn validate_mint_borrow_nft(
     collateral_rate_in_lovelace,
     collateral_asset,
     collateral_amount_in_lovelace,
+    ..
   } = collateral_output_datum
 
   expect [Pair(nft_asset_name, nft_quantity)] =
@@ -135,9 +134,6 @@ fn validate_mint_borrow_nft(
   let borrower_receives_nft =
     quantity_of(borrow_output.value, policy_id, nft_asset_name) == 1
 
-  let is_pool_hash_valid =
-    validate_pool_hash(inputs, tusd_policy_id, tusd_asset_name, tusd_pool_hash)
-
   and {
     validate_protocol_parameters(
       reference_inputs,
@@ -154,8 +150,8 @@ fn validate_mint_borrow_nft(
     loan_nft_pid_valid_in_datum?,
     loan_nft_mint?,
     borrower_receives_nft?,
-    is_pool_hash_valid?,
   }
+  // is_pool_hash_valid?,
 }
 
 fn validate_protocol_parameters(
