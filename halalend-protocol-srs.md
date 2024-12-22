@@ -22,7 +22,7 @@ There are 4 contracts in the borrow feature:
 
 - ### Repayment:
 
-There are 3 contracts in the add liquidity feature:
+There are 3 contracts in the repayment feature:
 
 - Loan NFT Validator: Validates the conditions necessary for the repayment of loan and burning of the loan NFT
 - Collateral validator: Validates that the loan UTxO has satisfied the terms to be returned back to the loan NFT holder
@@ -30,7 +30,7 @@ There are 3 contracts in the add liquidity feature:
 
 - ### Liquidation:
 
-There are 2 contracts in the add liquidity feature:
+There are 2 contracts in the liquidation feature:
 
 - Collateral validator: Validates the condition necessary for liquidation; checks oracle rate and liquidation ratio
 - Protocol Parameter Validator: Returns reference transaction input with the protocol parameters
