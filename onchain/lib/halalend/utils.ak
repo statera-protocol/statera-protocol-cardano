@@ -1,7 +1,7 @@
 use aiken/collection/list
 use aiken/crypto.{ScriptHash, VerificationKeyHash}
 use aiken/interval.{Finite, PositiveInfinity}
-use cardano/address.{Script}
+use cardano/address.{Script, VerificationKey}
 use cardano/transaction.{Input, Output, OutputReference, ValidityRange}
 
 // validate that the transaction is signed by 'signer'
@@ -42,23 +42,33 @@ pub fn find_input_by_hash(inputs: List<Input>, script_hash: ScriptHash) {
   )
 }
 
-/// Filters inputs by hash
-pub fn filter_inputs_by_hash(inputs: List<Input>, script_hash: ScriptHash) {
+/// Finds output by verification key hash
+pub fn find_output_by_vkh(outputs: List<Output>, vkh: VerificationKeyHash) {
+  list.find(
+    outputs,
+    fn(output) { output.address.payment_credential == VerificationKey(vkh) },
+  )
+}
+
+/// Filters inputs by verification key hash
+pub fn filter_inputs_by_vkh(inputs: List<Input>, vkh: VerificationKeyHash) {
   list.filter(
     inputs,
-    fn(input) { input.output.address.payment_credential == Script(script_hash) },
+    fn(input) {
+      input.output.address.payment_credential == VerificationKey(vkh)
+    },
   )
 }
 
-/// Filters outputs by hash
-pub fn filter_outputs_by_hash(outputs: List<Output>, script_hash: ScriptHash) {
-  list.filter(
-    outputs,
-    fn(output) { output.address.payment_credential == Script(script_hash) },
-  )
-}
+// /// Filters outputs by hash
+// pub fn filter_outputs_by_hash(outputs: List<Output>, script_hash: ScriptHash) {
+//   list.filter(
+//     outputs,
+//     fn(output) { output.address.payment_credential == Script(script_hash) },
+//   )
+// }
 
-/// Finds an input by it's script hash
+/// Finds an output by it's script hash
 pub fn find_output_by_hash(outputs: List<Output>, script_hash: ScriptHash) {
   list.find(
     outputs,

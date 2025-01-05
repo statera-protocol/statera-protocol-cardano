@@ -11,6 +11,8 @@ use mocktail/virgin_output_reference.{mock_utxo_ref}
 pub type MintLoanRedeemer {
   GetLoan
   RepayLoan
+  // To be removed. Just for testing and creating oracle utxo
+  GetStables
 }
 
 validator mint_loan_validator(collateral_validator_hash: ScriptHash) {
@@ -22,6 +24,7 @@ validator mint_loan_validator(collateral_validator_hash: ScriptHash) {
         validate_get_loan(collateral_validator_hash, outputs, mint, policy_id)
       RepayLoan ->
         validate_repay_loan(collateral_validator_hash, inputs, mint, policy_id)
+      GetStables -> True
     }
   }
 

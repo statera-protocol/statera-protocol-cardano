@@ -1,6 +1,7 @@
 import { BuiltinByteString, conStr, conStr0, ConStr0, deserializeDatum, Integer, mConStr0, mConStr1 } from "@meshsdk/core";
 import { blockchainProvider, multiSigAddress, txBuilder, wallet1, wallet1Address, wallet1Collateral, wallet1Utxos } from "../setup.js";
 import { collateralValidatorAddress, collateralValidatorScript, loanNftValidatorScript, oracleUtxo, protocolParametersUtxo, mintLoanUnit, mintLoanValidatorScript, mintLoanPolicyId, mintLoanAssetNameHex } from "./setup.js";
+import { CollateralDatum } from "./util.js";
 
 if (!oracleUtxo) {
     throw new Error('Oracle UTxO not found!');
@@ -13,18 +14,6 @@ const loanNftUtxo = (await blockchainProvider.fetchUTxOs(
     1
 ))[0];
 const loanNftUtxoAmountUnits = loanNftUtxo.output.amount.map((amount) => amount.unit);
-
-type CollateralDatum = ConStr0<[
-    BuiltinByteString,
-    BuiltinByteString,
-    BuiltinByteString,
-    Integer,
-    BuiltinByteString,
-    Integer,
-    BuiltinByteString,
-    Integer,
-    Integer,
-]>;
 
 let userLoanNFTUnit = "";
 let userLoanAmount = 0;

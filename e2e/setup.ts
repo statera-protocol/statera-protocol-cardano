@@ -86,7 +86,10 @@ const nativeScript: NativeScript = {
     ],
 };
 const { address: multiSigAddress, scriptCbor: multiSigCbor } = serializeNativeScript(nativeScript);
+console.log("nativeScript:", nativeScript);
+console.log("serializeNativeScript:", serializeNativeScript(nativeScript));
 const multisigHash = resolveNativeScriptHash(nativeScript);
+console.log("multisigHash:", multisigHash);
 
 // Evaluator for Aiken verbose mode
 const evaluator = new OfflineEvaluator(blockchainProvider, "preprod");
@@ -94,7 +97,7 @@ const evaluator = new OfflineEvaluator(blockchainProvider, "preprod");
 const txBuilder = new MeshTxBuilder({
     fetcher: blockchainProvider,
     submitter: blockchainProvider,
-    evaluator: evaluator,
+    evaluator: evaluator, // Can also be "evaluator: blockchainProvider,"
     verbose: false,
 });
 txBuilder.setNetwork('preprod');

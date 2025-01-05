@@ -1,5 +1,20 @@
-import { Asset, BuiltinByteString, ConStr0, deserializeDatum, Integer, List } from "@meshsdk/core";
+import { Asset, BuiltinByteString, ConStr0, ConStr1, deserializeDatum, Integer, List } from "@meshsdk/core";
 
+type CollateralDatum = ConStr0<[
+    BuiltinByteString,
+    BuiltinByteString,
+    BuiltinByteString,
+    Integer,
+    BuiltinByteString,
+    Integer,
+    BuiltinByteString,
+    Integer,
+    Integer,
+]>;
+
+type DepositDatum = ConStr1<[
+    BuiltinByteString
+]>;
 
 type ProtocolParametersDatum = ConStr0<
     [
@@ -39,4 +54,6 @@ const calculateLoanAmount = (
 
 export {
     calculateLoanAmount,
+    CollateralDatum,
+    DepositDatum,
 }

@@ -1,25 +1,34 @@
 use aiken/collection/dict
-use aiken/crypto.{ScriptHash}
-use cardano/address.{Address, Script}
+use aiken/collection/list
+use aiken/crypto.{ScriptHash, VerificationKeyHash}
+use cardano/address.{Address, Script, VerificationKey}
 use cardano/assets.{
-  AssetName, PolicyId, from_asset, from_asset_list, from_lovelace, lovelace_of,
-  quantity_of,
+  AssetName, PolicyId, Value, from_asset, from_asset_list, from_lovelace,
+  lovelace_of, quantity_of,
 }
 use cardano/transaction.{
   InlineDatum, Input, NoDatum, Output, OutputReference, Transaction, find_input,
   placeholder,
 }
 use halalend/constants.{usd_with_lovelace_precision_factor}
-use halalend/datums.{CollateralDatum, ProtocolParametersDatum}
-use halalend/utils.{
-  calculate_by_percentage, find_input_by_hash, find_output_by_hash,
+use halalend/datums.{
+  CollateralDatum, CollateralValidatorDatum, DepositorDatum,
+  ProtocolParametersDatum,
 }
-use mocktail/virgin_key_hash.{mock_policy_id, mock_script_hash}
+use halalend/utils.{
+  calculate_by_percentage, filter_inputs_by_vkh, find_input_by_hash,
+  find_output_by_hash, find_output_by_vkh, signed_by,
+}
+use mocktail/virgin_key_hash.{
+  mock_policy_id, mock_pub_key_hash, mock_script_hash,
+}
 use mocktail/virgin_output_reference.{mock_utxo_ref}
 
 pub type Action {
   Refund
   Liquidate
+  WithdrawDeposit
+  IncreaseDeposit
 }
 
 validator collateral_validator(
@@ -28,51 +37,139 @@ validator collateral_validator(
   liquidated_funds_collector_hash: ScriptHash,
 ) {
   spend(
-    datum: Option<CollateralDatum>,
+    datum: Option<CollateralValidatorDatum>,
     redeemer: Action,
     o_ref: OutputReference,
     self: Transaction,
   ) {
-    let Transaction { inputs, outputs, mint, reference_inputs, .. } = self
+    let Transaction {
+      inputs,
+      outputs,
+      mint,
+      reference_inputs,
+      extra_signatories,
+      ..
+    } = self
 
     expect Some(own_input) = find_input(inputs, o_ref)
 
-    expect Some(CollateralDatum {
-      tusd_policy_id,
-      tusd_asset_name,
-      loan_nft_pid,
-      collateral_rate_in_lovelace,
-      ..
-    }) = datum
+    when datum is {
+      Some(CollateralDatum { .. }) ->
+        handle_collateral(
+          protocol_parameters_hash,
+          oracle_hash,
+          liquidated_funds_collector_hash,
+          datum,
+          redeemer,
+          mint,
+          outputs,
+          reference_inputs,
+          own_input,
+        )
+      Some(DepositorDatum { .. }) ->
+        handle_withdraw_and_increase_deposit(
+          datum,
+          redeemer,
+          extra_signatories,
+          own_input,
+          outputs,
+        )
+      _ -> False
+    }
+  }
 
-    when redeemer is {
-      Refund -> {
-        expect [Pair(_, quantity)] =
-          mint |> assets.tokens(loan_nft_pid) |> dict.to_pairs
+  mint(_redeemer: Data, policy_id: PolicyId, self: Transaction) {
+    let Transaction { inputs, outputs, mint, .. } = self
 
-        (quantity == -1)?
+    expect Some(deposit_output) = find_output_by_hash(outputs, policy_id)
+
+    expect InlineDatum(deposit_output_datum) = deposit_output.datum
+    expect DepositorDatum { depositor_vkh } = deposit_output_datum
+
+    expect [Pair(name, quantity)] =
+      mint
+        |> assets.tokens(policy_id)
+        |> dict.to_pairs
+
+    expect Some(output_to_depositor) =
+      find_output_by_vkh(outputs, depositor_vkh)
+
+    let depositor_inputs = filter_inputs_by_vkh(inputs, depositor_vkh)
+    let depositor_inputs_total_ada =
+      depositor_inputs
+        |> list.foldl(
+            0,
+            fn(input, ada_total) {
+              let ada_amount = lovelace_of(input.output.value)
+              ada_amount + ada_total
+            },
+          )
+
+    let is_mint_valid = and {
+        (name == "statera-receipt")?,
+        (quantity == 1)?,
       }
+    let is_mint_to_depositor =
+      quantity_of(output_to_depositor.value, policy_id, name) == 1
+    let is_deposit_ada_amount_valid =
+      depositor_inputs_total_ada >= lovelace_of(deposit_output.value)
 
-      Liquidate -> and {
-          is_liquidation_threshold_reached(
-            protocol_parameters_hash,
-            oracle_hash,
-            collateral_rate_in_lovelace,
-            reference_inputs,
-            tusd_policy_id,
-            tusd_asset_name,
-          ),
-          liquidated_funds_must_go_to_collector(
-            outputs,
-            own_input,
-            liquidated_funds_collector_hash,
-          ),
-        }
+    and {
+      is_mint_valid?,
+      is_mint_to_depositor?,
+      is_deposit_ada_amount_valid?,
     }
   }
 
   else(_) {
     fail
+  }
+}
+
+fn handle_collateral(
+  protocol_parameters_hash: ScriptHash,
+  oracle_hash: ScriptHash,
+  liquidated_funds_collector_hash: ScriptHash,
+  datum: Option<CollateralValidatorDatum>,
+  redeemer: Action,
+  mint: Value,
+  outputs: List<Output>,
+  reference_inputs: List<Input>,
+  own_input: Input,
+) {
+  expect Some(CollateralDatum {
+    tusd_policy_id,
+    tusd_asset_name,
+    loan_nft_pid,
+    collateral_rate_in_lovelace,
+    ..
+  }) = datum
+
+  when redeemer is {
+    Refund -> {
+      expect [Pair(_, quantity)] =
+        mint |> assets.tokens(loan_nft_pid) |> dict.to_pairs
+
+      (quantity == -1)?
+    }
+
+    Liquidate -> and {
+        is_liquidation_threshold_reached(
+          protocol_parameters_hash,
+          oracle_hash,
+          collateral_rate_in_lovelace,
+          reference_inputs,
+          tusd_policy_id,
+          tusd_asset_name,
+        )?,
+        liquidated_funds_must_go_to_collector(
+          outputs,
+          own_input,
+          liquidated_funds_collector_hash,
+        )?,
+      }
+
+    _ -> False
   }
 }
 
@@ -129,6 +226,35 @@ fn liquidated_funds_must_go_to_collector(
   let collector_output_lovelace_value = collector_output.value |> lovelace_of
 
   (own_input_lovelace_value == collector_output_lovelace_value)?
+}
+
+fn handle_withdraw_and_increase_deposit(
+  datum: Option<CollateralValidatorDatum>,
+  redeemer: Action,
+  extra_signatories: List<VerificationKeyHash>,
+  own_input: Input,
+  outputs: List<Output>,
+) {
+  expect Some(DepositorDatum { depositor_vkh }) = datum
+
+  when redeemer is {
+    WithdrawDeposit -> signed_by(extra_signatories, depositor_vkh)?
+    IncreaseDeposit -> {
+      expect Script(own_hash) = own_input.output.address.payment_credential
+      expect Some(deposit_output) = find_output_by_hash(outputs, own_hash)
+      expect InlineDatum(deposit_output_datum) = deposit_output.datum
+      expect DepositorDatum { depositor_vkh: output_depositor_vkh } =
+        deposit_output_datum
+
+      and {
+        depositor_vkh == output_depositor_vkh,
+        // To allow for increase deposit, total deposit has to be greater than initial balance
+        lovelace_of(deposit_output.value) > lovelace_of(own_input.output.value),
+        signed_by(extra_signatories, depositor_vkh)?,
+      }
+    }
+    _ -> False
+  }
 }
 
 // Tests
@@ -272,6 +398,192 @@ test test_liquidate_loan_with_liquidation_threshold_reached() {
     Some(collateral_datum),
     Liquidate,
     collateral_input_utxo_ref,
+    tx,
+  )
+}
+
+test test_spend_deposit() {
+  let protocol_parameters_script_hash = mock_script_hash(1)
+  let oracle_script_hash = mock_script_hash(4)
+  let liquidated_funds_collector_script_hash = mock_script_hash(5)
+  let deposit_input_utxo_ref = mock_utxo_ref(0, 1)
+  let collateral_validator_script_hash = mock_script_hash(2)
+  let depositor_vkh = mock_pub_key_hash(0)
+
+  let deposit_datum = DepositorDatum { depositor_vkh }
+  let deposit_input =
+    Input {
+      output_reference: deposit_input_utxo_ref,
+      output: Output {
+        address: Address {
+          payment_credential: Script(collateral_validator_script_hash),
+          stake_credential: None,
+        },
+        value: from_lovelace(2000000),
+        datum: InlineDatum(deposit_datum),
+        reference_script: None,
+      },
+    }
+
+  let tx =
+    Transaction {
+      ..placeholder,
+      inputs: [deposit_input],
+      extra_signatories: [depositor_vkh],
+    }
+
+  collateral_validator.spend(
+    protocol_parameters_script_hash,
+    oracle_script_hash,
+    liquidated_funds_collector_script_hash,
+    Some(deposit_datum),
+    WithdrawDeposit,
+    deposit_input_utxo_ref,
+    tx,
+  )
+}
+
+test test_deposit_value() {
+  let protocol_parameters_script_hash = mock_script_hash(1)
+  let oracle_script_hash = mock_script_hash(4)
+  let liquidated_funds_collector_script_hash = mock_script_hash(5)
+  let deposit_input_utxo_ref = mock_utxo_ref(0, 1)
+  let depositor_vkh = mock_pub_key_hash(0)
+  let collateral_validator_script_hash = mock_script_hash(2)
+
+  let deposit_input =
+    Input {
+      output_reference: deposit_input_utxo_ref,
+      output: Output {
+        address: Address {
+          payment_credential: VerificationKey(depositor_vkh),
+          stake_credential: None,
+        },
+        value: from_lovelace(5000000),
+        datum: NoDatum,
+        reference_script: None,
+      },
+    }
+  let deposit_input2 =
+    Input {
+      output_reference: deposit_input_utxo_ref,
+      output: Output {
+        address: Address {
+          payment_credential: VerificationKey(depositor_vkh),
+          stake_credential: None,
+        },
+        value: from_lovelace(2000000),
+        datum: NoDatum,
+        reference_script: None,
+      },
+    }
+
+  let deposit_datum = DepositorDatum { depositor_vkh }
+  let deposit_output =
+    Output {
+      address: Address {
+        payment_credential: Script(collateral_validator_script_hash),
+        stake_credential: None,
+      },
+      value: from_lovelace(4000000),
+      datum: InlineDatum(deposit_datum),
+      reference_script: None,
+    }
+
+  let receipt =
+    from_asset(collateral_validator_script_hash, "statera-receipt", 1)
+
+  let depositor_output =
+    Output {
+      address: Address {
+        payment_credential: VerificationKey(depositor_vkh),
+        stake_credential: None,
+      },
+      value: assets.merge(from_lovelace(2000000), receipt),
+      datum: NoDatum,
+      reference_script: None,
+    }
+
+  let tx =
+    Transaction {
+      ..placeholder,
+      inputs: [deposit_input, deposit_input2],
+      outputs: [deposit_output, depositor_output],
+      mint: receipt,
+    }
+
+  collateral_validator.mint(
+    protocol_parameters_script_hash,
+    oracle_script_hash,
+    liquidated_funds_collector_script_hash,
+    "",
+    collateral_validator_script_hash,
+    tx,
+  )
+}
+
+test test_increase_deposit() {
+  let protocol_parameters_script_hash = mock_script_hash(1)
+  let oracle_script_hash = mock_script_hash(4)
+  let liquidated_funds_collector_script_hash = mock_script_hash(5)
+  let deposit_input_utxo_ref = mock_utxo_ref(0, 1)
+  let depositor_vkh = mock_pub_key_hash(0)
+  let collateral_validator_script_hash = mock_script_hash(2)
+
+  let depositor_input =
+    Input {
+      output_reference: mock_utxo_ref(0, 3),
+      output: Output {
+        address: Address {
+          payment_credential: VerificationKey(depositor_vkh),
+          stake_credential: None,
+        },
+        value: from_lovelace(5000000),
+        datum: NoDatum,
+        reference_script: None,
+      },
+    }
+
+  let deposit_datum = DepositorDatum { depositor_vkh }
+  let deposit_input =
+    Input {
+      output_reference: deposit_input_utxo_ref,
+      output: Output {
+        address: Address {
+          payment_credential: Script(collateral_validator_script_hash),
+          stake_credential: None,
+        },
+        value: from_lovelace(4000000),
+        datum: InlineDatum(deposit_datum),
+        reference_script: None,
+      },
+    }
+  let deposit_output =
+    Output {
+      address: Address {
+        payment_credential: Script(collateral_validator_script_hash),
+        stake_credential: None,
+      },
+      value: from_lovelace(5000000),
+      datum: InlineDatum(deposit_datum),
+      reference_script: None,
+    }
+
+  let tx =
+    Transaction {
+      ..placeholder,
+      inputs: [deposit_input, depositor_input],
+      outputs: [deposit_output],
+      extra_signatories: [depositor_vkh],
+    }
+
+  collateral_validator.spend(
+    protocol_parameters_script_hash,
+    oracle_script_hash,
+    liquidated_funds_collector_script_hash,
+    Some(deposit_datum),
+    IncreaseDeposit,
+    deposit_input_utxo_ref,
     tx,
   )
 }
