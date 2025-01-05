@@ -43,3 +43,11 @@
 - Liquidate:
   - Tx should be signed by admin
   - The loan_term should have ended or The collateral value should have gone below or equal to the minimum collateralization threshold
+
+
+
+# New
+## collateral validator (deposit action):
+- User locks value in the contract
+- During locking, a receipt token is minted to the user
+- User can spend locked value if he is a required signer

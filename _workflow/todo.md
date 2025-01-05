@@ -5,3 +5,8 @@
 <!-- IMMEDIATE CHANGES -->
 - User's loanNFTValidator script hash has to be stored somewhere so as to be reused during repayment:
     Store it in the collateral utxo. (Design decision: Validate that a reference script is being sent with the utxo)
+- In utils.ak, functions to find by hash should take either scripthash or verificationKeyHash instead of just script hash
+
+# Suggestions
+- We can mint an identfier token too to the deposit utxo in collateral validator so as to differentiate between allowed utxos and non-allowed ones.
+- Use another UTxO as txInCollateral instead of collateral from user's wallet
