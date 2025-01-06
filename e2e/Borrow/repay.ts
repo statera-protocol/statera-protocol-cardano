@@ -14,7 +14,6 @@ const loanNftUtxo = (await blockchainProvider.fetchUTxOs(
     1
 ))[0];
 const loanNftUtxoAmountUnits = loanNftUtxo.output.amount.map((amount) => amount.unit);
-
 let userLoanNFTUnit = "";
 let userLoanAmount = 0;
 

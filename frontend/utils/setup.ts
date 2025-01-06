@@ -33,9 +33,10 @@ export const setup = async (blockchainProvider: MaestroProvider, walletUtxos: UT
   if (!ProtocolParameterValidator) {
       throw new Error('Protocol Parameter Validator not found!');
   }
+  const adminWalletVk = "96cbb27c96daf8cab890de6d7f87f5ffd025bf8ac80717cbc4fae7da"
   const protocolParametersScript = applyParamsToScript(
       ProtocolParameterValidator[0].compiledCode,
-      [builtinByteString(walletVK)],
+      [builtinByteString(adminWalletVk)],
       "JSON"
   );
   const protocolParametersAddress = serializePlutusScript(
@@ -92,7 +93,7 @@ export const setup = async (blockchainProvider: MaestroProvider, walletUtxos: UT
     ? (utxo.output.amount[1].unit == mintLoanUnit && utxo.output.amount[1].quantity == "24")
     : false
   ));
-  // console.log("oracleUtxo:", oracleUtxo);
+  console.log("oracleUtxo:", oracleUtxo);
   const oracleUtxoForLiquidation  = oracleAddressUtxos.find((utxo) => (
     (utxo.output.amount.length > 1)
     ? (utxo.output.amount[1].unit == mintLoanUnit && utxo.output.amount[1].quantity == "12")
@@ -124,14 +125,24 @@ export const setup = async (blockchainProvider: MaestroProvider, walletUtxos: UT
   });
   // console.log("userDepositUtxos:", userDepositUtxos);
 
-  const aBorrowInput = (await blockchainProvider.fetchUTxOs(
-    userDepositUtxos[0].input.txHash,
-    userDepositUtxos[0].input.outputIndex,
-  ))[0];
+  let aBorrowInput: UTxO | undefined = undefined;
+  // If user exist, get his account utxo, if its a new user, use a random utxo since the loanNftValidatorScript won't
+  // be used anyway for a new user
+  if (userDepositUtxos.length > 0) {
+    aBorrowInput = (await blockchainProvider.fetchUTxOs(
+      userDepositUtxos[0].input.txHash,
+      userDepositUtxos[0].input.outputIndex,
+    ))[0];
+  } else {
+    aBorrowInput = (await blockchainProvider.fetchUTxOs(
+      "3c149a5500447e8f8c7a508ef47f1743da0ff2e4ef4c6d02b1a44a9888c89569",
+      0,
+    ))[0];
+  }
   // const aBorrowInput = "";
   const paramUtxo = outputReference(aBorrowInput.input.txHash, aBorrowInput.input.outputIndex);
-  // const paramUtxo = outputReference("3c149a5500447e8f8c7a508ef47f1743da0ff2e4ef4c6d02b1a44a9888c89569", 0);
   // TODO: Find a way to save this script or get it to reuse during repayment
+  // SOLUTION: For now, we are using Maestro service
   const loanNftValidatorScript = applyParamsToScript(
     loanNftValidatorCode[0].compiledCode,
     [

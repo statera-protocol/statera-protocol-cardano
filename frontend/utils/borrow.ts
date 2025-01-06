@@ -28,7 +28,7 @@ export const borrow = async (
         throw new Error('Protocol Parameters UTxO not found!');
     }
     
-    const loanNftName = "statera-borrow";
+    const loanNftName = "statera-brw" + "-" + (String(userDepositUtxos[0].input.txHash).slice(0, 3) + "#" + String(userDepositUtxos[0].input.outputIndex));
     const loanNftNameHex = stringToHex(loanNftName);
     const loanNftUnit = loanNftPolicyId + loanNftNameHex;
     

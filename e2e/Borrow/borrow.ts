@@ -10,7 +10,7 @@ if (!protocolParametersUtxo) {
     throw new Error('Protocol Parameters UTxO not found!');
 }
 
-const loanNftName = "statera-borrow";
+const loanNftName = "statera-borrow" + "-" + (String(userDepositUtxos[0].input.txHash).slice(0, 5) + "#" + String(userDepositUtxos[0].input.outputIndex));
 // const loanNftName = "St-New-Model-Liquidation";
 const loanNftNameHex = stringToHex(loanNftName);
 const loanNftUnit = loanNftPolicyId + loanNftNameHex;
@@ -21,6 +21,8 @@ const [oracleRate, loanAmount] = calculateLoanAmount(
     protocolParametersUtxo.output.plutusData,
     collateralAmmountInLovelaces,
 );
+
+console.log("loanNftName:", loanNftName);
 
 console.log('loanAmount:', loanAmount);
 
