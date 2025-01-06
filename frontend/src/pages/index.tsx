@@ -12,6 +12,7 @@ import { borrow } from "../../utils/borrow";
 import { getLoanPositionDetails, getLoanPositions } from "../../utils/getLoanPositions";
 import { repayLoan } from "../../utils/repay";
 import { withdraw } from "../../utils/withdraw";
+import { partialWithdraw } from "../../utils/partialWithdraw";
 
 type DappStateType = {
   walletUtxos: UTxO[],
@@ -55,6 +56,7 @@ export default function Home() {
   const [loanAmount, setLoanAmount] = useState(0);
   const [loanPositions, setloanPositions] = useState<UTxO[]>([]);
   const [loanPositionsDisplay, setloanPositionsDisplay] = useState<number>(0);
+  const [partialWithdrawAmount, setPartialWithdrawAmount] = useState<string>("");
 
   const handleOnConnected = async () => {
     const gottenDappState = await configureApp(wallet);
@@ -269,6 +271,37 @@ export default function Home() {
     );
   }
 
+  const handlePartialWithdraw = async () => {
+    if (!DappState) {
+      throw new Error("Dapp state isn't initialized");
+    }
+
+    const {
+      txBuilder,
+      walletAddress,
+      walletCollateral,
+      walletUtxos,
+      walletVK,
+      collateralValidatorAddress,
+      collateralValidatorScript,
+      userDepositUtxos
+    } = DappState;
+    await partialWithdraw(
+      txBuilder,
+      wallet,
+      walletAddress,
+      walletCollateral,
+      walletUtxos,
+      walletVK,
+      collateralValidatorAddress,
+      collateralValidatorScript,
+      userDepositUtxos,
+      partialWithdrawAmount,
+    );
+
+    setPartialWithdrawAmount("");
+  }
+
   return (
     <div className="bg-gray-900 w-full text-white text-center">
       <Head>
@@ -292,13 +325,34 @@ export default function Home() {
         {/* The Application */}
         {connected && (DappState ? (<div className="mb-20">
           <p className="text-xl">Your balance in Statera: <i>{DappState.userDepositUtxos.length > 0 ? `${(Number(DappState.userDepositUtxos[0].output.amount[0].quantity) / 1000000)} ADA` : `0 ADA`}</i></p>
-          {DappState.userDepositUtxos.length > 0 && <Button
-            className="my-4 mb-6"
-            onClick={handleWithdrawAll}
-            disabled={false}
-          >
-            Withdraw All
-          </Button>}
+          {DappState.userDepositUtxos.length > 0 &&
+            <>
+              <h3 className="mb-6 mt-12 text-4xl font-bold">Withdraw</h3>
+              <Input
+                type="text"
+                name="partialWithdrawAmount"
+                id="partialWithdrawAmount"
+                value={partialWithdrawAmount}
+                onInput={(e) => setPartialWithdrawAmount(e.currentTarget.value)}
+              >
+                Put in ADA amount
+              </Input>
+              <Button
+                className="my-4"
+                onClick={handlePartialWithdraw}
+                disabled={!partialWithdrawAmount}
+              >
+                Withdraw
+              </Button>
+              <br />
+              <Button
+                className="my-4 bg-red-700"
+                onClick={handleWithdrawAll}
+                disabled={false}
+              >
+                Withdraw All/Close Account
+              </Button>
+            </>}
           <h3 className="mb-6 mt-12 text-4xl font-bold">Deposit</h3>
           {DappState.userDepositUtxos.length <= 0 ? (
             <p className="italic text-xl text-red-500">You seem to be a new User.. You can deposit to get started.

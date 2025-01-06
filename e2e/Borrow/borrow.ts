@@ -15,7 +15,7 @@ const loanNftName = "statera-borrow" + "-" + (String(userDepositUtxos[0].input.t
 const loanNftNameHex = stringToHex(loanNftName);
 const loanNftUnit = loanNftPolicyId + loanNftNameHex;
 
-const collateralAmmountInLovelaces = "150000000"; // 150 ADA
+const collateralAmmountInLovelaces = "135000000"; // 135 ADA
 const [oracleRate, loanAmount] = calculateLoanAmount(
     oracleUtxo?.output.amount,
     protocolParametersUtxo.output.plutusData,

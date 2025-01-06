@@ -29,6 +29,7 @@ pub type Action {
   Liquidate
   WithdrawDeposit
   IncreaseDeposit
+  PartialWithdrawal
 }
 
 validator collateral_validator(
@@ -86,7 +87,8 @@ validator collateral_validator(
     expect InlineDatum(deposit_output_datum) = deposit_output.datum
     expect DepositorDatum { depositor_vkh } = deposit_output_datum
 
-    expect [Pair(name, quantity)] =
+    // Note: The asset names are gotten in alphabetical order...
+    expect [Pair(identifier_name, identifier_quantity), Pair(receipt_name, receipt_quantity)] =
       mint
         |> assets.tokens(policy_id)
         |> dict.to_pairs
@@ -106,17 +108,22 @@ validator collateral_validator(
           )
 
     let is_mint_valid = and {
-        (name == "statera-receipt")?,
-        (quantity == 1)?,
+        (receipt_name == "statera-receipt")?,
+        (receipt_quantity == 1)?,
+        (identifier_name == "st-identifier")?,
+        (identifier_quantity == 1)?,
       }
-    let is_mint_to_depositor =
-      quantity_of(output_to_depositor.value, policy_id, name) == 1
+    let is_receipt_to_depositor =
+      quantity_of(output_to_depositor.value, policy_id, receipt_name) == 1
+    let is_identifier_to_own_script =
+      quantity_of(deposit_output.value, policy_id, identifier_name) == 1
     let is_deposit_ada_amount_valid =
       depositor_inputs_total_ada >= lovelace_of(deposit_output.value)
 
     and {
       is_mint_valid?,
-      is_mint_to_depositor?,
+      is_receipt_to_depositor?,
+      is_identifier_to_own_script?,
       is_deposit_ada_amount_valid?,
     }
   }
@@ -239,18 +246,46 @@ fn handle_withdraw_and_increase_deposit(
 
   when redeemer is {
     WithdrawDeposit -> signed_by(extra_signatories, depositor_vkh)?
-    IncreaseDeposit -> {
+    IncreaseDeposit | PartialWithdrawal -> {
       expect Script(own_hash) = own_input.output.address.payment_credential
       expect Some(deposit_output) = find_output_by_hash(outputs, own_hash)
       expect InlineDatum(deposit_output_datum) = deposit_output.datum
       expect DepositorDatum { depositor_vkh: output_depositor_vkh } =
         deposit_output_datum
 
-      and {
-        depositor_vkh == output_depositor_vkh,
-        // To allow for increase deposit, total deposit has to be greater than initial balance
-        lovelace_of(deposit_output.value) > lovelace_of(own_input.output.value),
-        signed_by(extra_signatories, depositor_vkh)?,
+      expect and {
+          (depositor_vkh == output_depositor_vkh)?,
+          signed_by(extra_signatories, depositor_vkh)?,
+        }
+
+      when redeemer is {
+        IncreaseDeposit ->
+          // To allow for increase deposit, total deposit has to be greater than initial balance
+          (lovelace_of(deposit_output.value) > lovelace_of(
+            own_input.output.value,
+          ))?
+        PartialWithdrawal -> {
+          // Expect an output to the depositor vkh whose lovelace value is the exact withdrawal amount
+          expect Some(_withdrawal_output) =
+            outputs
+              |> list.find(
+                  fn(output) {
+                    and {
+                      output.address.payment_credential == VerificationKey(
+                        depositor_vkh,
+                      ),
+                      lovelace_of(output.value) == lovelace_of(
+                        own_input.output.value,
+                      ) - lovelace_of(deposit_output.value),
+                    }
+                  },
+                )
+          // To allow for partial withdrawal, final balance has to be less than initial balance
+          (lovelace_of(deposit_output.value) < lovelace_of(
+            own_input.output.value,
+          ))?
+        }
+        _ -> False
       }
     }
     _ -> False
@@ -478,6 +513,9 @@ test test_deposit_value() {
       },
     }
 
+  let identifier =
+    from_asset(collateral_validator_script_hash, "st-identifier", 1)
+
   let deposit_datum = DepositorDatum { depositor_vkh }
   let deposit_output =
     Output {
@@ -485,7 +523,7 @@ test test_deposit_value() {
         payment_credential: Script(collateral_validator_script_hash),
         stake_credential: None,
       },
-      value: from_lovelace(4000000),
+      value: assets.merge(from_lovelace(4000000), identifier),
       datum: InlineDatum(deposit_datum),
       reference_script: None,
     }
@@ -509,7 +547,7 @@ test test_deposit_value() {
       ..placeholder,
       inputs: [deposit_input, deposit_input2],
       outputs: [deposit_output, depositor_output],
-      mint: receipt,
+      mint: assets.merge(receipt, identifier),
     }
 
   collateral_validator.mint(
@@ -583,6 +621,69 @@ test test_increase_deposit() {
     liquidated_funds_collector_script_hash,
     Some(deposit_datum),
     IncreaseDeposit,
+    deposit_input_utxo_ref,
+    tx,
+  )
+}
+
+test test_partial_withdrawal() {
+  let protocol_parameters_script_hash = mock_script_hash(1)
+  let oracle_script_hash = mock_script_hash(4)
+  let liquidated_funds_collector_script_hash = mock_script_hash(5)
+  let deposit_input_utxo_ref = mock_utxo_ref(0, 1)
+  let depositor_vkh = mock_pub_key_hash(0)
+  let collateral_validator_script_hash = mock_script_hash(2)
+
+  let depositor_output =
+    Output {
+      address: Address {
+        payment_credential: VerificationKey(depositor_vkh),
+        stake_credential: None,
+      },
+      value: from_lovelace(1000000),
+      datum: NoDatum,
+      reference_script: None,
+    }
+
+  let deposit_datum = DepositorDatum { depositor_vkh }
+  let deposit_input =
+    Input {
+      output_reference: deposit_input_utxo_ref,
+      output: Output {
+        address: Address {
+          payment_credential: Script(collateral_validator_script_hash),
+          stake_credential: None,
+        },
+        value: from_lovelace(5000000),
+        datum: InlineDatum(deposit_datum),
+        reference_script: None,
+      },
+    }
+  let deposit_output =
+    Output {
+      address: Address {
+        payment_credential: Script(collateral_validator_script_hash),
+        stake_credential: None,
+      },
+      value: from_lovelace(4000000),
+      datum: InlineDatum(deposit_datum),
+      reference_script: None,
+    }
+
+  let tx =
+    Transaction {
+      ..placeholder,
+      inputs: [deposit_input],
+      outputs: [deposit_output, depositor_output],
+      extra_signatories: [depositor_vkh],
+    }
+
+  collateral_validator.spend(
+    protocol_parameters_script_hash,
+    oracle_script_hash,
+    liquidated_funds_collector_script_hash,
+    Some(deposit_datum),
+    PartialWithdrawal,
     deposit_input_utxo_ref,
     tx,
   )

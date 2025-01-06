@@ -1,4 +1,4 @@
-import { applyCborEncoding, applyParamsToScript, builtinByteString, deserializeDatum, integer, outputReference, resolveScriptHash, serializePlutusScript, stringToHex } from "@meshsdk/core";
+import { applyCborEncoding, applyParamsToScript, builtinByteString, deserializeDatum, integer, outputReference, resolveScriptHash, serializePlutusScript, stringToHex, UTxO } from "@meshsdk/core";
 import { blockchainProvider, blueprint, multisigHash, wallet1Utxos, wallet1VK } from "../setup.js";
 import { parameterizedScript as protocolParametersScript, scriptAddr as protocolParametersAddress } from "../ProtocolParameter/validator.js";
 import { DepositDatum } from "./util.js";
@@ -94,13 +94,21 @@ console.log("userDepositUtxos:", userDepositUtxos);
 
 // TODO: aBorrowInput will be automatically selected in from the user's wallet
 //   search for an ada only utxo, if not available, use the next one with the lowest no. of assets
-const aBorrowInput = (await blockchainProvider.fetchUTxOs(
-    userDepositUtxos[0].input.txHash,
-    userDepositUtxos[0].input.outputIndex,
-))[0];
-// const aBorrowInput = "";
+let aBorrowInput: UTxO | undefined = undefined;
+  // If user exist, get his account utxo, if its a new user, use a random utxo since the loanNftValidatorScript won't
+  // be used anyway for a new user
+  if (userDepositUtxos.length > 0) {
+    aBorrowInput = (await blockchainProvider.fetchUTxOs(
+      userDepositUtxos[0].input.txHash,
+      userDepositUtxos[0].input.outputIndex,
+    ))[0];
+  } else {
+    aBorrowInput = (await blockchainProvider.fetchUTxOs(
+      "3c149a5500447e8f8c7a508ef47f1743da0ff2e4ef4c6d02b1a44a9888c89569",
+      0,
+    ))[0];
+  }
 const paramUtxo = outputReference(aBorrowInput.input.txHash, aBorrowInput.input.outputIndex);
-// const paramUtxo = outputReference("3c149a5500447e8f8c7a508ef47f1743da0ff2e4ef4c6d02b1a44a9888c89569", 0);
 // TODO: Find a way to save this script or get it to reuse during repayment
 const loanNftValidatorScript = applyParamsToScript(
     loanNftValidatorCode[0].compiledCode,

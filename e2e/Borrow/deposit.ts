@@ -6,6 +6,10 @@ const receiptTokenName = "statera-receipt";
 const receiptTokenNameHex = stringToHex(receiptTokenName);
 const receiptTokenUnit = collateralValidatorScriptHash +  receiptTokenNameHex;
 
+const identifierTokenName = "st-identifier";
+const identifierTokenNameHex = stringToHex(identifierTokenName);
+const identifierTokenUnit = collateralValidatorScriptHash +  identifierTokenNameHex;
+
 // This field should be dynamic
 const depositAmountInt = 200; // In Ada
 const depositAmount = String(depositAmountInt * 1000000);
@@ -19,8 +23,12 @@ const unsignedTx = await txBuilder
     .mint("1", collateralValidatorScriptHash, receiptTokenNameHex)
     .mintingScript(collateralValidatorScript)
     .mintRedeemerValue("")
+    .mintPlutusScriptV3()
+    .mint("1", collateralValidatorScriptHash, identifierTokenNameHex)
+    .mintingScript(collateralValidatorScript)
+    .mintRedeemerValue("")
     .txOut(wallet1Address, [{ unit: receiptTokenUnit, quantity: "1" }])
-    .txOut(collateralValidatorAddress, [{ unit: "lovelace", quantity: depositAmount }])
+    .txOut(collateralValidatorAddress, [{ unit: "lovelace", quantity: depositAmount }, { unit: identifierTokenUnit, quantity: "1" }])
     .txOutInlineDatumValue(depositDatum)
     .txInCollateral(
         wallet1Collateral.input.txHash,

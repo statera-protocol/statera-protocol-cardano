@@ -110,8 +110,18 @@ export const setup = async (blockchainProvider: MaestroProvider, walletUtxos: UT
 
   // get all collateral UTxOs
   const collateralUtxos = await blockchainProvider.fetchAddressUTxOs(collateralValidatorAddress);
+  // get genuine collateral UTxOs
+  const genuineCollateralUtxos = collateralUtxos.filter((utxo) => {
+    const utxoAmountUnits = utxo.output.amount.map((amount) => amount.unit);
+
+    for (let i = 0; i < utxoAmountUnits.length; i++) {
+      if (utxoAmountUnits[i] == (collateralValidatorScriptHash + stringToHex("st-identifier"))) {
+        return true;
+      }
+    }
+  })
   // filter deposit UTxOs with user's vkh
-  const userDepositUtxos = collateralUtxos.filter((utxo) => {
+  const userDepositUtxos = genuineCollateralUtxos.filter((utxo) => {
     const datumData = utxo.output.plutusData
     if (!datumData) {
         return false;
