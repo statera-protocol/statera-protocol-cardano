@@ -168,6 +168,11 @@ export const setup = async (blockchainProvider: MaestroProvider, walletUtxos: UT
   ).address;
   const loanNftPolicyId = resolveScriptHash(loanNftValidatorScript, "V3");
 
+  // User account balance identifier token
+  const identifierTokenName = "st-identifier";
+  const identifierTokenNameHex = stringToHex(identifierTokenName);
+  const identifierTokenUnit = collateralValidatorScriptHash +  identifierTokenNameHex;
+
   // Utils
   // console.log('LIQUIDITY POOL UTXOS:', mintLoanUtxos);
   // console.log('mintLoanValidatorAddress:', mintLoanValidatorAddress);
@@ -200,5 +205,7 @@ export const setup = async (blockchainProvider: MaestroProvider, walletUtxos: UT
     userDepositUtxos,
     multiSigAddress,
     multisigHash,
+    identifierTokenNameHex,
+    identifierTokenUnit,
   }
 }

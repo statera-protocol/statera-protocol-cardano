@@ -100,7 +100,12 @@ fn validate_mint_borrow_nft(
     mint |> assets.tokens(tusd_policy_id) |> dict.to_pairs
   let is_loan_mint_quantity_valid = mint_loan_quantity == tusd_borrowed
 
-  expect Some(oracle_ref) = find_input_by_hash(reference_inputs, oracle_hash)
+  expect Some(oracle_ref) = reference_inputs |> list.find(fn(ref_i) {
+    and {
+      (Script(oracle_hash) == ref_i.output.address.payment_credential)?,
+      (quantity_of(ref_i.output.value, tusd_policy_id, tusd_asset_name) > 0)?,
+    }
+  })
 
   expect Some(borrow_input) = find_input(inputs, borrow_utxo)
   expect
@@ -159,6 +164,8 @@ fn validate_mint_borrow_nft(
     quantity_of(oracle_ref.output.value, tusd_policy_id, tusd_asset_name)
   let oracle_lovelace_usd_rate =
     oracle_usd_value * usd_with_lovelace_precision_factor / oracle_lovelace_value
+  trace @"oracle_usd_value": oracle_usd_value
+  trace @"oracle_lovelace_value": oracle_lovelace_value
 
   let borrow_output_usd =
     quantity_of(borrow_output.value, tusd_policy_id, tusd_asset_name)
@@ -190,7 +197,6 @@ fn validate_mint_borrow_nft(
     loan_nft_mint?,
     borrower_receives_nft?,
   }
-  // is_pool_hash_valid?,
 }
 
 fn validate_protocol_parameters(
@@ -226,6 +232,8 @@ fn validate_protocol_parameters(
 
   let is_rate_and_mcr_valid =
     borrow_lovelace_usd_rate == oracle_lovelace_usd_rate
+  trace @"borrow lovelace usd rate": borrow_lovelace_usd_rate
+  trace @"oracle lovelace usd rate": oracle_lovelace_usd_rate
 
   let is_rate_in_datum_valid =
     borrow_lovelace_usd_rate == collateral_rate_in_lovelace

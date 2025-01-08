@@ -30,7 +30,7 @@ export const configureApp = async (wallet: IWallet) => {
     fetcher: blockchainProvider,
     submitter: blockchainProvider,
     evaluator: evaluator, // Can also be "evaluator: blockchainProvider,"
-    verbose: false,
+    verbose: true,
   });
   txBuilder.setNetwork('preprod');
 

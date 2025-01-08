@@ -10,7 +10,9 @@ use cardano/transaction.{
   InlineDatum, Input, NoDatum, Output, OutputReference, Transaction, find_input,
   placeholder,
 }
-use halalend/constants.{usd_with_lovelace_precision_factor}
+use halalend/constants.{
+  identifier_token_name, receipt_token_name, usd_with_lovelace_precision_factor,
+}
 use halalend/datums.{
   CollateralDatum, CollateralValidatorDatum, DepositorDatum,
   ProtocolParametersDatum,
@@ -88,7 +90,10 @@ validator collateral_validator(
     expect DepositorDatum { depositor_vkh } = deposit_output_datum
 
     // Note: The asset names are gotten in alphabetical order...
-    expect [Pair(identifier_name, identifier_quantity), Pair(receipt_name, receipt_quantity)] =
+    expect [
+      Pair(identifier_name, identifier_quantity),
+      Pair(receipt_name, receipt_quantity),
+    ] =
       mint
         |> assets.tokens(policy_id)
         |> dict.to_pairs
@@ -108,9 +113,9 @@ validator collateral_validator(
           )
 
     let is_mint_valid = and {
-        (receipt_name == "statera-receipt")?,
+        (receipt_name == receipt_token_name)?,
         (receipt_quantity == 1)?,
-        (identifier_name == "st-identifier")?,
+        (identifier_name == identifier_token_name)?,
         (identifier_quantity == 1)?,
       }
     let is_receipt_to_depositor =
@@ -259,11 +264,18 @@ fn handle_withdraw_and_increase_deposit(
         }
 
       when redeemer is {
-        IncreaseDeposit ->
-          // To allow for increase deposit, total deposit has to be greater than initial balance
-          (lovelace_of(deposit_output.value) > lovelace_of(
-            own_input.output.value,
-          ))?
+        IncreaseDeposit -> and {
+            // To allow for increase deposit, total deposit has to be greater than initial balance
+            (lovelace_of(deposit_output.value) > lovelace_of(
+              own_input.output.value,
+            ))?,
+            // Make sure that the identifier token is sent with the deposit and no other asset is sent
+            (assets.without_lovelace(deposit_output.value) == from_asset(
+              own_hash,
+              identifier_token_name,
+              1,
+            ))?,
+          }
         PartialWithdrawal -> {
           // Expect an output to the depositor vkh whose lovelace value is the exact withdrawal amount
           expect Some(_withdrawal_output) =
@@ -280,10 +292,18 @@ fn handle_withdraw_and_increase_deposit(
                     }
                   },
                 )
-          // To allow for partial withdrawal, final balance has to be less than initial balance
-          (lovelace_of(deposit_output.value) < lovelace_of(
-            own_input.output.value,
-          ))?
+          and {
+            // To allow for partial withdrawal, final balance has to be less than initial balance
+            (lovelace_of(deposit_output.value) < lovelace_of(
+              own_input.output.value,
+            ))?,
+            // Make sure that the identifier token is sent with the deposit and no other asset is sent
+            (assets.without_lovelace(deposit_output.value) == from_asset(
+              own_hash,
+              identifier_token_name,
+              1,
+            ))?,
+          }
         }
         _ -> False
       }
@@ -602,7 +622,10 @@ test test_increase_deposit() {
         payment_credential: Script(collateral_validator_script_hash),
         stake_credential: None,
       },
-      value: from_lovelace(5000000),
+      value: assets.merge(
+        from_lovelace(5000000),
+        from_asset(collateral_validator_script_hash, identifier_token_name, 1),
+      ),
       datum: InlineDatum(deposit_datum),
       reference_script: None,
     }
@@ -665,7 +688,10 @@ test test_partial_withdrawal() {
         payment_credential: Script(collateral_validator_script_hash),
         stake_credential: None,
       },
-      value: from_lovelace(4000000),
+      value: assets.merge(
+        from_lovelace(4000000),
+        from_asset(collateral_validator_script_hash, identifier_token_name, 1),
+      ),
       datum: InlineDatum(deposit_datum),
       reference_script: None,
     }

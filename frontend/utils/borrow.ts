@@ -1,4 +1,4 @@
-import { IWallet, mConStr0, mConStr1, mConStr2, MeshTxBuilder, stringToHex, UTxO } from "@meshsdk/core";
+import { IWallet, mConStr, mConStr0, mConStr1, mConStr2, MeshTxBuilder, stringToHex, UTxO } from "@meshsdk/core";
 import { calculateLoanAmount } from "./util";
 
 export const borrow = async (
@@ -9,7 +9,6 @@ export const borrow = async (
     walletUtxos: UTxO[],
     walletVK: string,
     collateralValidatorAddress: string,
-    collateralValidatorScript: string,
     userDepositUtxos: UTxO[],
     loanNftPolicyId: string,
     loanNftValidatorScript: string,
@@ -20,6 +19,7 @@ export const borrow = async (
     mintLoanUnit: string,
     mintLoanValidatorScript: string,
     collateralAmmountInLovelaces: string,
+    identifierTokenUnit: string,
 ) => {
     if (!oracleUtxo) {
         throw new Error('Oracle UTxO not found!');
@@ -27,6 +27,10 @@ export const borrow = async (
     if (!protocolParametersUtxo) {
         throw new Error('Protocol Parameters UTxO not found!');
     }
+
+    // Collateral validator reference script info
+    const cVRSTxHash = "e0e4066d4356a6f7f5372985bc591f219c4839064f499daca2d771bdfe47383f";
+    const cVRSTxIndex = 0;
     
     const loanNftName = "statera-brw" + "-" + (String(userDepositUtxos[0].input.txHash).slice(0, 3) + "#" + String(userDepositUtxos[0].input.outputIndex));
     const loanNftNameHex = stringToHex(loanNftName);
@@ -52,11 +56,13 @@ export const borrow = async (
         "ada",
         Number(collateralAmmountInLovelaces),
     ]);
-    
+
     const depositDatum = mConStr1([
         walletVK
     ]);
-    
+
+    console.log("in borrow, oracle utxo:", oracleUtxo);
+
     const unsignedTx = await txBuilder
         // spend deposit utxo by user
         .spendingPlutusScriptV3()
@@ -66,9 +72,9 @@ export const borrow = async (
             userDepositUtxos[0].output.amount,
             userDepositUtxos[0].output.address,
         )
-        .txInScript(collateralValidatorScript)
+        .spendingTxInReference(cVRSTxHash, cVRSTxIndex)
         .spendingReferenceTxInInlineDatumPresent()
-        .spendingReferenceTxInRedeemerValue(mConStr2([]))
+        .spendingReferenceTxInRedeemerValue(mConStr(2, []))
         // mint loan NFT
         .mintPlutusScriptV3()
         .mint("1", loanNftPolicyId, loanNftNameHex)
@@ -83,7 +89,7 @@ export const borrow = async (
         .txOut(collateralValidatorAddress, [ { unit: "lovelace", quantity: collateralAmmountInLovelaces } ])
         .txOutInlineDatumValue(collateralDatum)
         // send change as deposit to collateral validator address
-        .txOut(collateralValidatorAddress, [ { unit: "lovelace", quantity: String(changeAmount) } ])
+        .txOut(collateralValidatorAddress, [ { unit: "lovelace", quantity: String(changeAmount) }, { unit: identifierTokenUnit, quantity: "1" } ])
         .txOutInlineDatumValue(depositDatum)
         // send loan NFT and loan tokens to borrower
         .txOut(walletAddress, [ { unit: loanNftUnit, quantity: "1" }, { unit: mintLoanUnit, quantity: String(loanAmount) }])
@@ -100,9 +106,9 @@ export const borrow = async (
         .requiredSignerHash(walletVK)
         .selectUtxosFrom(walletUtxos)
         .complete()
-    
+
     const signedTx = await wallet.signTx(unsignedTx);
     const txHash = await wallet.submitTx(signedTx);
-    
+
     console.log('Statera Borrow tx Hash:', txHash);
 }

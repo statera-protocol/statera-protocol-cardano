@@ -79,6 +79,10 @@ export const repayLoan = async (
       "JSON"
     );
 
+    // Collateral validator reference script info
+    const cVRSTxHash = "e0e4066d4356a6f7f5372985bc591f219c4839064f499daca2d771bdfe47383f";
+    const cVRSTxIndex = 0;
+
     const unsignedTx = await txBuilder
         .txIn(
             loanNftUtxo.input.txHash,
@@ -93,7 +97,7 @@ export const repayLoan = async (
             collateralUtxo.output.amount,
             collateralUtxo.output.address,
         )
-        .txInScript(collateralValidatorScript)
+        .spendingTxInReference(cVRSTxHash, cVRSTxIndex)
         .spendingReferenceTxInInlineDatumPresent()
         .spendingReferenceTxInRedeemerValue(mConStr0([]))
         .mintPlutusScriptV3()

@@ -11,6 +11,7 @@ export const increaseDeposit = async (
     collateralValidatorScript: string,
     userDepositUtxos: UTxO[],
     depositAmountInt: string | undefined,
+    identifierTokenUnit: string,
 ) => {
     if (!depositAmountInt) {
         throw new Error("Deposit amount int is undefined");
@@ -33,7 +34,7 @@ export const increaseDeposit = async (
         .txInScript(collateralValidatorScript)
         .spendingReferenceTxInInlineDatumPresent()
         .spendingReferenceTxInRedeemerValue(mConStr3([]))
-        .txOut(collateralValidatorAddress, [{ unit: "lovelace", quantity: depositAmount }])
+        .txOut(collateralValidatorAddress, [{ unit: "lovelace", quantity: depositAmount }, { unit: identifierTokenUnit, quantity: "1" }])
         .txOutInlineDatumValue(depositDatum)
         .txInCollateral(
             walletCollateral.input.txHash,

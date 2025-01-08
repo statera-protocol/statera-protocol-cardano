@@ -45,6 +45,8 @@ type DappStateType = {
   userDepositUtxos: UTxO[],
   multiSigAddress: string,
   multisigHash: string,
+  identifierTokenNameHex: string,
+  identifierTokenUnit: string,
 }
 
 export default function Home() {
@@ -77,7 +79,10 @@ export default function Home() {
       walletVK,
       collateralValidatorAddress,
       collateralValidatorScript,
-      collateralValidatorScriptHash
+      collateralValidatorScriptHash,
+      identifierTokenNameHex,
+      identifierTokenUnit,
+
     } = DappState;
     await deposit(
       txBuilder, wallet,
@@ -89,6 +94,8 @@ export default function Home() {
       collateralValidatorScript,
       collateralValidatorScriptHash,
       addDepositAmount,
+      identifierTokenNameHex,
+      identifierTokenUnit,
     );
 
     setAddDepositAmount("");
@@ -107,7 +114,8 @@ export default function Home() {
       walletVK,
       collateralValidatorAddress,
       collateralValidatorScript,
-      userDepositUtxos
+      userDepositUtxos,
+      identifierTokenUnit,
     } = DappState;
     await increaseDeposit(
       txBuilder,
@@ -120,6 +128,7 @@ export default function Home() {
       collateralValidatorScript,
       userDepositUtxos,
       increaseDepositAmount,
+      identifierTokenUnit,
     );
 
     setIncreaseDepositAmount("");
@@ -157,7 +166,6 @@ export default function Home() {
       walletUtxos,
       walletVK,
       collateralValidatorAddress,
-      collateralValidatorScript,
       userDepositUtxos,
       loanNftPolicyId,
       loanNftValidatorScript,
@@ -167,6 +175,7 @@ export default function Home() {
       mintLoanPolicyId,
       mintLoanUnit,
       mintLoanValidatorScript,
+      identifierTokenUnit,
     } = DappState;
     await borrow(
       txBuilder,
@@ -176,7 +185,6 @@ export default function Home() {
       walletUtxos,
       walletVK,
       collateralValidatorAddress,
-      collateralValidatorScript,
       userDepositUtxos,
       loanNftPolicyId,
       loanNftValidatorScript,
@@ -187,6 +195,7 @@ export default function Home() {
       mintLoanUnit,
       mintLoanValidatorScript,
       collateralAmmountInLovelaces,
+      identifierTokenUnit,
     );
 
     setBorrowAmount("");
@@ -284,7 +293,8 @@ export default function Home() {
       walletVK,
       collateralValidatorAddress,
       collateralValidatorScript,
-      userDepositUtxos
+      userDepositUtxos,
+      identifierTokenUnit,
     } = DappState;
     await partialWithdraw(
       txBuilder,
@@ -297,6 +307,7 @@ export default function Home() {
       collateralValidatorScript,
       userDepositUtxos,
       partialWithdrawAmount,
+      identifierTokenUnit,
     );
 
     setPartialWithdrawAmount("");
@@ -327,6 +338,13 @@ export default function Home() {
           <p className="text-xl">Your balance in Statera: <i>{DappState.userDepositUtxos.length > 0 ? `${(Number(DappState.userDepositUtxos[0].output.amount[0].quantity) / 1000000)} ADA` : `0 ADA`}</i></p>
           {DappState.userDepositUtxos.length > 0 &&
             <>
+              <Button
+                className="my-4"
+                onClick={handleOnConnected}
+                disabled={false}
+              >
+                Refresh
+              </Button>
               <h3 className="mb-6 mt-12 text-4xl font-bold">Withdraw</h3>
               <Input
                 type="text"

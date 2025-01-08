@@ -11,6 +11,7 @@ export const partialWithdraw = async (
     collateralValidatorScript: string,
     userDepositUtxos: UTxO[],
     withdrawAmountInt: string | undefined,
+    identifierTokenUnit: string,
 ) => {
     const balanceAmountInt = (Number(userDepositUtxos[0].output.amount[0].quantity) - (Number(withdrawAmountInt) * 1000000));
     const withdrawAmount = String(Number(withdrawAmountInt) * 1000000);
@@ -32,7 +33,7 @@ export const partialWithdraw = async (
         .spendingReferenceTxInInlineDatumPresent()
         .spendingReferenceTxInRedeemerValue(mConStr(4, []))
         .txOut(walletAddress, [{ unit: "lovelace", quantity: withdrawAmount }])
-        .txOut(collateralValidatorAddress, [{ unit: "lovelace", quantity: balanceAmount }])
+        .txOut(collateralValidatorAddress, [{ unit: "lovelace", quantity: balanceAmount }, { unit: identifierTokenUnit, quantity: "1" }])
         .txOutInlineDatumValue(depositDatum)
         .txInCollateral(
             walletCollateral.input.txHash,

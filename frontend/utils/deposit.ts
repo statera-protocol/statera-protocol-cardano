@@ -11,6 +11,8 @@ export const deposit = async (
     collateralValidatorScript: string,
     collateralValidatorScriptHash: string,
     depositAmountInt: string | undefined,
+    identifierTokenNameHex: string,
+    identifierTokenUnit: string,
 ) => {
     const receiptTokenName = "statera-receipt";
     const receiptTokenNameHex = stringToHex(receiptTokenName);
@@ -30,8 +32,12 @@ export const deposit = async (
         .mint("1", collateralValidatorScriptHash, receiptTokenNameHex)
         .mintingScript(collateralValidatorScript)
         .mintRedeemerValue("")
+        .mintPlutusScriptV3()
+        .mint("1", collateralValidatorScriptHash, identifierTokenNameHex)
+        .mintingScript(collateralValidatorScript)
+        .mintRedeemerValue("")
         .txOut(walletAddress, [{ unit: receiptTokenUnit, quantity: "1" }])
-        .txOut(collateralValidatorAddress, [{ unit: "lovelace", quantity: depositAmount }])
+        .txOut(collateralValidatorAddress, [{ unit: "lovelace", quantity: depositAmount }, { unit: identifierTokenUnit, quantity: "1" }])
         .txOutInlineDatumValue(depositDatum)
         .txInCollateral(
             walletCollateral.input.txHash,

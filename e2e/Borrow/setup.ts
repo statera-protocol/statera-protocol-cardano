@@ -60,7 +60,7 @@ const oracleUtxo  = oracleAddressUtxos.find((utxo) => (
     ? (utxo.output.amount[1].unit == mintLoanUnit && utxo.output.amount[1].quantity == "24")
     : false
 ));
-// console.log("oracleUtxo:", oracleUtxo);
+console.log("oracleUtxo:", oracleUtxo);
 const oracleUtxoForLiquidation  = oracleAddressUtxos.find((utxo) => (
     (utxo.output.amount.length > 1)
     ? (utxo.output.amount[1].unit == mintLoanUnit && utxo.output.amount[1].quantity == "12")
