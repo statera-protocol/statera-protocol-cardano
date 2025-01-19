@@ -16,6 +16,7 @@ pub type CollateralValidatorDatum {
     tusd_asset_name: AssetName,
     tusd_borrowed: Int,
     loan_nft_pid: PolicyId,
+    loan_nft_asset_name: AssetName,
     collateral_rate_in_lovelace: Int,
     collateral_asset: ByteArray,
     collateral_amount_in_lovelace: Int,
