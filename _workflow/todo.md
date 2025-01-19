@@ -4,11 +4,5 @@
 
 - Depending on either single loan position or multiple loan positions, make deposit use withrawDeposit or partialWithdrawal
 
-<!-- IMMEDIATE CHANGES -->
-.....
-- In mint loan validator, and withdrawal in collateral validator, find the output whose datum corresponds not just output by hash so as to avoid conflicting outputs going to same hash but with different datum.
-- Do like the above for this output: Line 147, `expect Some(collateral_output)`, ... `let is_borrow_input_to_collateral_validator =`
-
-# Suggestions
-- We can mint an identfier token too to the deposit utxo in collateral validator so as to differentiate between allowed utxos and non-allowed ones.
-- Use another UTxO as txInCollateral instead of collateral from user's wallet
+<!-- RECOMMENDED CHANGES -->
+- Confirm only one outputs and inputs of user balance and collateral utxos: Use list.filter and confirm only one element.

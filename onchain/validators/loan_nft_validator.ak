@@ -1,3 +1,4 @@
+// use aiken/primitive/bytearray.{to_string}
 use aiken/collection/dict
 use aiken/collection/list
 use aiken/crypto.{ScriptHash}
@@ -10,15 +11,12 @@ use cardano/transaction.{
   InlineDatum, Input, NoDatum, Output, OutputReference, Transaction, find_input,
   placeholder,
 }
-use halalend/constants.{usd_with_lovelace_precision_factor}
+use halalend/constants.{usd_with_lovelace_precision_factor, identifier_token_name}
 use halalend/datums.{
   CollateralDatum, CollateralValidatorDatum, DepositorDatum,
   ProtocolParametersDatum,
 }
-use halalend/utils.{
-  calculate_by_percentage, find_input_by_hash, find_output_by_hash,
-  find_output_by_vkh,
-}
+use halalend/utils.{calculate_by_percentage, find_input_by_hash}
 use mocktail/virgin_key_hash.{
   mock_policy_id, mock_pub_key_hash, mock_script_hash,
 }
@@ -77,8 +75,31 @@ fn validate_mint_borrow_nft(
   outputs: List<Output>,
   borrow_utxo: OutputReference,
 ) {
+  // find collateral output going to collateral validator script and make sure it's datum is of type CollateralDatum
   expect Some(collateral_output) =
-    find_output_by_hash(outputs, collateral_validator_hash)
+    list.find(
+      outputs,
+      fn(output) {
+        and {
+          trace @"collateral_validator_hash": collateral_validator_hash
+          (output.address.payment_credential == Script(
+            collateral_validator_hash,
+          ))?,
+          when output.datum is {
+            InlineDatum(output_datum) ->
+              if output_datum is CollateralValidatorDatum {
+                when output_datum is {
+                  CollateralDatum { .. } -> True
+                  _ -> False
+                }
+              } else {
+                False
+              }
+            _ -> False
+          },
+        }
+      },
+    )
 
   expect InlineDatum(collateral_output_datum) = collateral_output.datum
 
@@ -93,6 +114,9 @@ fn validate_mint_borrow_nft(
     ..
   } = collateral_output_datum
 
+  let is_borrow_ada_amount_valid =
+    lovelace_of(collateral_output.value) == collateral_amount_in_lovelace
+
   expect [Pair(nft_asset_name, nft_quantity)] =
     mint |> assets.tokens(policy_id) |> dict.to_pairs
 
@@ -100,12 +124,16 @@ fn validate_mint_borrow_nft(
     mint |> assets.tokens(tusd_policy_id) |> dict.to_pairs
   let is_loan_mint_quantity_valid = mint_loan_quantity == tusd_borrowed
 
-  expect Some(oracle_ref) = reference_inputs |> list.find(fn(ref_i) {
-    and {
-      (Script(oracle_hash) == ref_i.output.address.payment_credential)?,
-      (quantity_of(ref_i.output.value, tusd_policy_id, tusd_asset_name) > 0)?,
-    }
-  })
+  expect Some(oracle_ref) =
+    reference_inputs
+      |> list.find(
+          fn(ref_i) {
+            and {
+              (Script(oracle_hash) == ref_i.output.address.payment_credential)?,
+              (quantity_of(ref_i.output.value, tusd_policy_id, tusd_asset_name) > 0)?,
+            }
+          },
+        )
 
   expect Some(borrow_input) = find_input(inputs, borrow_utxo)
   expect
@@ -119,26 +147,22 @@ fn validate_mint_borrow_nft(
     list.find(
       outputs,
       fn(output) {
-        when output.datum is {
-          InlineDatum(change_output_datum) ->
-            if change_output_datum is CollateralValidatorDatum {
-              trace @"change output found"
-              when change_output_datum is {
-                DepositorDatum {
-                  depositor_vkh: change_output_datum_depositor_vkh,
-                } -> and {
+          when output.datum is {
+            InlineDatum(change_output_datum) ->
+              if change_output_datum is DepositorDatum {
+                    depositor_vkh: change_output_datum_depositor_vkh,
+                  }: CollateralValidatorDatum {
+                and {
                     output.address.payment_credential == Script(
                       collateral_validator_hash,
                     ),
                     depositor_vkh == change_output_datum_depositor_vkh,
                   }
-                _ -> False
+                } else {
+                False
               }
-            } else {
-              False
-            }
-          _ -> False
-        }
+            _ -> False
+          }
       },
     )
   // Check that the change of borrow input goes back as deposit to the collateral validator
@@ -147,25 +171,26 @@ fn validate_mint_borrow_nft(
       change_output.value,
     )
 
-  expect Some(borrow_output) = find_output_by_vkh(outputs, depositor_vkh)
-
-  expect Some(collateral_output) =
-    list.find(
-      outputs,
-      fn(output) { lovelace_of(output.value) == collateral_amount_in_lovelace },
-    )
-  let is_borrow_input_to_collateral_validator =
-    collateral_output.address.payment_credential == Script(
-      collateral_validator_hash,
-    )
+  // find a borrow output that has the loan NFT is going to
+  expect Some(borrow_output) =
+    outputs
+      |> list.find(
+          fn(output) {
+            and {
+              output.address.payment_credential == VerificationKey(
+                depositor_vkh,
+              ),
+              quantity_of(output.value, policy_id, nft_asset_name) == 1,
+            }
+          },
+        )
 
   let oracle_lovelace_value = lovelace_of(oracle_ref.output.value)
   let oracle_usd_value =
     quantity_of(oracle_ref.output.value, tusd_policy_id, tusd_asset_name)
-  let oracle_lovelace_usd_rate =
+  let oracle_lovelace_usd_rate = oracle_lovelace_value / oracle_usd_value
+  let oracle_usd_lovelace_rate =
     oracle_usd_value * usd_with_lovelace_precision_factor / oracle_lovelace_value
-  trace @"oracle_usd_value": oracle_usd_value
-  trace @"oracle_lovelace_value": oracle_lovelace_value
 
   let borrow_output_usd =
     quantity_of(borrow_output.value, tusd_policy_id, tusd_asset_name)
@@ -176,9 +201,6 @@ fn validate_mint_borrow_nft(
 
   let loan_nft_mint = nft_quantity == 1
 
-  let borrower_receives_nft =
-    quantity_of(borrow_output.value, policy_id, nft_asset_name) == 1
-
   and {
     validate_protocol_parameters(
       reference_inputs,
@@ -187,15 +209,15 @@ fn validate_mint_borrow_nft(
       collateral_amount_in_lovelace,
       borrow_output_usd,
       oracle_lovelace_usd_rate,
+      oracle_usd_lovelace_rate,
       collateral_asset,
     )?,
+    is_borrow_ada_amount_valid?,
     is_borrow_input_change_returned?,
     is_loan_mint_quantity_valid?,
-    is_borrow_input_to_collateral_validator?,
     is_tsud_borrowed_valid_in_datum?,
     loan_nft_pid_valid_in_datum?,
     loan_nft_mint?,
-    borrower_receives_nft?,
   }
 }
 
@@ -206,6 +228,7 @@ fn validate_protocol_parameters(
   collateral_amount_in_lovelace: Int,
   borrow_output_usd: Int,
   oracle_lovelace_usd_rate: Int,
+  oracle_usd_lovelace_rate: Int,
   collateral_asset: ByteArray,
 ) {
   expect Some(protocol_parameters_ref) =
@@ -227,16 +250,16 @@ fn validate_protocol_parameters(
       min_collateral_ratio,
       100,
     )
-  let borrow_lovelace_usd_rate =
-    borrow_output_usd * usd_with_lovelace_precision_factor / hundred_percent_lovelace_value
+  let expected_borrow_lovelace = borrow_output_usd * oracle_lovelace_usd_rate
 
   let is_rate_and_mcr_valid =
-    borrow_lovelace_usd_rate == oracle_lovelace_usd_rate
-  trace @"borrow lovelace usd rate": borrow_lovelace_usd_rate
-  trace @"oracle lovelace usd rate": oracle_lovelace_usd_rate
+    hundred_percent_lovelace_value >= expected_borrow_lovelace
+  trace @"hundred_percent_lovelace_value": hundred_percent_lovelace_value
+  trace @"expected_borrow_lovelace": expected_borrow_lovelace
+  trace @"oracle_lovelace_usd_rate": oracle_lovelace_usd_rate
 
   let is_rate_in_datum_valid =
-    borrow_lovelace_usd_rate == collateral_rate_in_lovelace
+    oracle_usd_lovelace_rate == collateral_rate_in_lovelace
 
   let is_loan_amount_valid = borrow_output_usd >= min_loan_amount
 
@@ -261,36 +284,70 @@ fn validate_burn_borrow_nft(
 
   expect InlineDatum(collateral_input_datum) = collateral_input.output.datum
 
-  expect CollateralDatum { tusd_policy_id, tusd_borrowed, loan_nft_pid, .. } =
+  expect CollateralDatum { tusd_policy_id, tusd_borrowed, loan_nft_pid, collateral_amount_in_lovelace, .. } =
     collateral_input_datum
 
   expect [Pair(loan_nft_name, quantity)] =
     mint |> assets.tokens(loan_nft_pid) |> dict.to_pairs
 
-  expect Some(loan_nft_refunder_input) =
+  // Find input user balance
+  expect Some(user_balance_input) =
+    list.find(
+      inputs,
+      fn(input) {
+        when input.output.datum is {
+          InlineDatum(change_input_datum) ->
+            if change_input_datum is DepositorDatum { .. }: CollateralValidatorDatum {
+              (input.output.address.payment_credential == Script(collateral_validator_hash))?
+            } else {
+              False
+            }
+          _ -> False
+        }
+      },
+    )
+  expect InlineDatum(user_balance_input_datum) = user_balance_input.output.datum
+  expect DepositorDatum { depositor_vkh } = user_balance_input_datum
+
+  // Find the loan NFT; make sure the loan NFT provider is the one whose whose balance will be update
+  expect Some(_loan_nft_refunder_input) =
     inputs
       |> list.find(
           fn(input) {
-            ( input.output.value |> quantity_of(loan_nft_pid, loan_nft_name) ) == 1
+            and {
+              (input.output.address.payment_credential == VerificationKey(depositor_vkh))?,
+              (( input.output.value |> quantity_of(loan_nft_pid, loan_nft_name) ) == 1)?,
+            }
           },
         )
 
   let is_loan_nft_burned = quantity == -1
 
+  // Find output user balance with same depositor_vkh
+  expect Some(user_balance_output) =
+    list.find(
+      outputs,
+      fn(output) {
+        when output.datum is {
+          InlineDatum(output_datum) ->
+            if output_datum is DepositorDatum { depositor_vkh: output_depositor_vkh }: CollateralValidatorDatum {
+              and {
+                (output.address.payment_credential == Script(collateral_validator_hash))?,
+                (depositor_vkh == output_depositor_vkh)?,
+              }
+            } else {
+              False
+            }
+          _ -> False
+        }
+      },
+    )
+
+  let is_collateral_going_back_to_refunder = (lovelace_of(user_balance_input.output.value) + collateral_amount_in_lovelace) == lovelace_of(user_balance_output.value)
+
   expect [Pair(_, refund_mint_quantity)] =
     mint |> assets.tokens(tusd_policy_id) |> dict.to_pairs
   let is_refund_amount_burned = refund_mint_quantity == -tusd_borrowed
-
-  let is_collateral_going_back_to_refunder =
-    outputs
-      |> list.any(
-          fn(output) {
-            and {
-              output.address.payment_credential == loan_nft_refunder_input.output.address.payment_credential,
-              output.value == collateral_input.output.value,
-            }
-          },
-        )
 
   and {
     is_loan_nft_burned?,
@@ -503,7 +560,7 @@ test test_repay_loan_burn_nft_with_right_values() {
       output_reference: refunder_outref,
       output: Output {
         address: Address {
-          payment_credential: Script(refunder_key_hash),
+          payment_credential: VerificationKey(refunder_key_hash),
           stake_credential: None,
         },
         value: refunder_value,
@@ -529,14 +586,31 @@ test test_repay_loan_burn_nft_with_right_values() {
       reference_script: None,
     }
 
-  let refunder_output =
+  let user_balance_datum = DepositorDatum { depositor_vkh: refunder_key_hash }
+  let user_balance_input =
+    Input {
+      output_reference: mock_utxo_ref(0, 11),
+      output: Output {
+        address: Address {
+          payment_credential: Script(collateral_validator_script_hash),
+          stake_credential: None,
+        },
+        value: from_lovelace(4000000),
+        datum: InlineDatum(user_balance_datum),
+        reference_script: None,
+      },
+    }
+  let user_balance_output =
     Output {
       address: Address {
-        payment_credential: Script(refunder_key_hash),
+        payment_credential: Script(collateral_validator_script_hash),
         stake_credential: None,
       },
-      value: from_lovelace(collateral_amount_in_lovelace),
-      datum: NoDatum,
+      value: assets.merge(
+        from_lovelace(4000000 + collateral_amount_in_lovelace),
+        from_asset(collateral_validator_script_hash, identifier_token_name, 1),
+      ),
+      datum: InlineDatum(user_balance_datum),
       reference_script: None,
     }
 
@@ -549,8 +623,8 @@ test test_repay_loan_burn_nft_with_right_values() {
   let tx =
     Transaction {
       ..placeholder,
-      inputs: [collateral_input, refunder_input],
-      outputs: [pool_output, refunder_output],
+      inputs: [collateral_input, refunder_input, user_balance_input],
+      outputs: [pool_output, user_balance_output],
       mint: mint,
     }
 

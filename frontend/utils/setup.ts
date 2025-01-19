@@ -3,6 +3,13 @@ import { applyCborEncoding, applyParamsToScript, builtinByteString, deserializeD
 import { DepositDatum } from "./util";
 import blueprint from "../../onchain/plutus.json" with { type: "json" };
 
+// Collateral validator reference script info
+const cVRSTxHash = "d5c842db681ec6a85fc02c1e6ebf46d98256754916bd4c1ef9212b230712986b";
+const cVRSTxIndex = 0;
+// Mint Loan validator reference script info
+const mintLoanScriptTxHash = "bb8686e88104b47cce663a942604a219a5aa4816f39e108910c5b06f750ba29d";
+const mintLoanScriptTxIndex = 0;
+
 export const setup = async (blockchainProvider: MaestroProvider, walletUtxos: UTxO[], walletVK: string) => {
   // Setup multisig script address where liquidated funds go to
   const nativeScript: NativeScript = {
@@ -67,6 +74,7 @@ export const setup = async (blockchainProvider: MaestroProvider, walletUtxos: UT
     { code: collateralValidatorScript, version: 'V3' },
   ).address;
   const collateralValidatorScriptHash = resolveScriptHash(collateralValidatorScript, "V3");
+  console.log("collateralValidatorScriptHash:", collateralValidatorScriptHash);
 
   // Mint loan validator
   const mintLoanValidatorCode = blueprint.validators.filter((val) => val.title.includes('mint_loan_validator.mint'));
@@ -208,4 +216,11 @@ export const setup = async (blockchainProvider: MaestroProvider, walletUtxos: UT
     identifierTokenNameHex,
     identifierTokenUnit,
   }
+}
+
+export {
+  cVRSTxHash,
+  cVRSTxIndex,
+  mintLoanScriptTxHash,
+  mintLoanScriptTxIndex,
 }

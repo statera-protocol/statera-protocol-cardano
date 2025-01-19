@@ -55,7 +55,7 @@ export default function Home() {
   const [addDepositAmount, setAddDepositAmount] = useState<string>("");
   const [increaseDepositAmount, setIncreaseDepositAmount] = useState<string>("");
   const [borrowAmount, setBorrowAmount] = useState<string>("");
-  const [loanAmount, setLoanAmount] = useState(0);
+  // const [loanAmount, setLoanAmount] = useState(0);
   const [loanPositions, setloanPositions] = useState<UTxO[]>([]);
   const [loanPositionsDisplay, setloanPositionsDisplay] = useState<number>(0);
   const [partialWithdrawAmount, setPartialWithdrawAmount] = useState<string>("");
@@ -136,7 +136,7 @@ export default function Home() {
 
   const trackBorrow = (borrowAmountInput: string) => {
     setBorrowAmount(borrowAmountInput);
-    setLoanAmount(getLoanAmount(String(Number(borrowAmountInput) * 1000000)).loanAmount);
+    // setLoanAmount(getLoanAmount(String(Number(borrowAmountInput) * 1000000)).loanAmount);
   }
 
   const getLoanAmount = (collateralAmmountInLovelaces: string) => {
@@ -154,7 +154,7 @@ export default function Home() {
     return { oracleRate, loanAmount };
   }
 
-  const handleBorrowLoan = async (collateralAmmountInLovelaces: string) => {
+  const handleBorrowLoan = async (tUSDLoanAmount: string) => {
     if (!DappState) {
       throw new Error("Dapp state isn't initialized");
     }
@@ -174,7 +174,6 @@ export default function Home() {
       mintLoanAssetNameHex,
       mintLoanPolicyId,
       mintLoanUnit,
-      mintLoanValidatorScript,
       identifierTokenUnit,
     } = DappState;
     await borrow(
@@ -193,8 +192,7 @@ export default function Home() {
       mintLoanAssetNameHex,
       mintLoanPolicyId,
       mintLoanUnit,
-      mintLoanValidatorScript,
-      collateralAmmountInLovelaces,
+      tUSDLoanAmount,
       identifierTokenUnit,
     );
 
@@ -222,16 +220,17 @@ export default function Home() {
       walletAddress,
       walletCollateral,
       walletUtxos,
-      collateralValidatorScript,
+      walletVK,
       collateralValidatorAddress,
       loanNftValidatorCode,
       oracleUtxo,
       mintLoanAssetNameHex,
       mintLoanPolicyId,
-      mintLoanValidatorScript,
       collateralValidatorScriptHash,
       protocolParametersScriptHash,
       oracleScriptHash,
+      userDepositUtxos,
+      identifierTokenUnit,
     } = DappState;
     await repayLoan(
       blockchainProvider,
@@ -240,17 +239,18 @@ export default function Home() {
       walletAddress,
       walletCollateral,
       walletUtxos,
-      collateralValidatorScript,
+      walletVK,
       collateralValidatorAddress,
       loanNftValidatorCode,
       oracleUtxo,
       mintLoanAssetNameHex,
       mintLoanPolicyId,
-      mintLoanValidatorScript,
       collateralValidatorScriptHash,
       protocolParametersScriptHash,
       oracleScriptHash,
       loanPosition,
+      userDepositUtxos,
+      identifierTokenUnit,
     );
   }
 
@@ -410,13 +410,13 @@ export default function Home() {
                 value={borrowAmount}
                 onInput={(e) => trackBorrow(e.currentTarget.value)}
               >
-                Put in collateral amount (ADA)
+                Put in collateral amount (tUSD). Make sure it's a whole number
               </Input>
-              <p>Equivalent loan amount in tUSD (Make sure this is a whole number): <i>{loanAmount}</i></p>
+              {/* <p>Equivalent loan amount in tUSD (Make sure this is a whole number): <i>{loanAmount}</i></p> */}
               <Button
                 className="my-4"
-                onClick={() => handleBorrowLoan(String(Number(borrowAmount) * 1000000))}
-                disabled={!borrowAmount || (loanAmount < 100 && !Number.isInteger(Number(loanAmount)))} // make isInteger work well
+                onClick={() => handleBorrowLoan(borrowAmount)}
+                disabled={!borrowAmount || Number(borrowAmount) < 100}
               >
                 Get Loan
               </Button>
@@ -427,7 +427,7 @@ export default function Home() {
                 onClick={handleGetLoanPositions}
                 disabled={false}
               >
-                Show Loan Positions
+                Refresh Loan Position(s)
               </Button>
               {(loanPositions.length) ? (<div>
                 <ol className="list-decimal">

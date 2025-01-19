@@ -1,5 +1,6 @@
 import { IWallet, mConStr, mConStr0, mConStr1, mConStr2, MeshTxBuilder, stringToHex, UTxO } from "@meshsdk/core";
-import { calculateLoanAmount } from "./util";
+import { calculateLoanAdaAmount } from "./util";
+import { cVRSTxHash, cVRSTxIndex, mintLoanScriptTxHash, mintLoanScriptTxIndex } from "./setup";
 
 export const borrow = async (
     txBuilder: MeshTxBuilder,
@@ -17,8 +18,7 @@ export const borrow = async (
     mintLoanAssetNameHex: string,
     mintLoanPolicyId: string,
     mintLoanUnit: string,
-    mintLoanValidatorScript: string,
-    collateralAmmountInLovelaces: string,
+    tUSDLoanAmount: string,
     identifierTokenUnit: string,
 ) => {
     if (!oracleUtxo) {
@@ -28,33 +28,30 @@ export const borrow = async (
         throw new Error('Protocol Parameters UTxO not found!');
     }
 
-    // Collateral validator reference script info
-    const cVRSTxHash = "e0e4066d4356a6f7f5372985bc591f219c4839064f499daca2d771bdfe47383f";
-    const cVRSTxIndex = 0;
-    
     const loanNftName = "statera-brw" + "-" + (String(userDepositUtxos[0].input.txHash).slice(0, 3) + "#" + String(userDepositUtxos[0].input.outputIndex));
     const loanNftNameHex = stringToHex(loanNftName);
     const loanNftUnit = loanNftPolicyId + loanNftNameHex;
-    
-    const [oracleRate, loanAmount] = calculateLoanAmount(
+
+    const [oracleRate, loanAmountAda] = calculateLoanAdaAmount(
         oracleUtxo?.output.amount,
         protocolParametersUtxo.output.plutusData,
-        collateralAmmountInLovelaces,
+        tUSDLoanAmount,
     );
-    
-    console.log('loanAmount:', loanAmount);
-    
-    const changeAmount = Number(userDepositUtxos[0].output.amount[0].quantity) - Number(collateralAmmountInLovelaces);
-    
+
+    console.log('oracleRate:', oracleRate);
+    console.log('loanAmountAda:', loanAmountAda);
+
+    const changeAmount = Number(userDepositUtxos[0].output.amount[0].quantity) - Number(loanAmountAda);
+
     const collateralDatum = mConStr0([
         mintLoanPolicyId,
         mintLoanPolicyId,
         mintLoanAssetNameHex,
-        loanAmount,
+        Number(tUSDLoanAmount),
         loanNftPolicyId,
-        (oracleRate * 1000000), // USD multiplied by ADA lovelaces bcs no decimals in blockhain
+        Math.ceil(oracleRate * 1000000), // USD multiplied by ADA lovelaces bcs no decimals in blockhain
         "ada",
-        Number(collateralAmmountInLovelaces),
+        Number(loanAmountAda),
     ]);
 
     const depositDatum = mConStr1([
@@ -62,6 +59,7 @@ export const borrow = async (
     ]);
 
     console.log("in borrow, oracle utxo:", oracleUtxo);
+    console.log("collateralValidatorAddress:", collateralValidatorAddress);
 
     const unsignedTx = await txBuilder
         // spend deposit utxo by user
@@ -82,17 +80,17 @@ export const borrow = async (
         .mintRedeemerValue(mConStr0([]))
         // mint loan tokens
         .mintPlutusScriptV3()
-        .mint(String(loanAmount), mintLoanPolicyId, mintLoanAssetNameHex)
-        .mintingScript(mintLoanValidatorScript)
+        .mint(tUSDLoanAmount, mintLoanPolicyId, mintLoanAssetNameHex)
+        .mintTxInReference(mintLoanScriptTxHash, mintLoanScriptTxIndex)
         .mintRedeemerValue(mConStr0([]))
         // send collateral to collateral validator address
-        .txOut(collateralValidatorAddress, [ { unit: "lovelace", quantity: collateralAmmountInLovelaces } ])
+        .txOut(collateralValidatorAddress, [ { unit: "lovelace", quantity: String(loanAmountAda) } ])
         .txOutInlineDatumValue(collateralDatum)
         // send change as deposit to collateral validator address
         .txOut(collateralValidatorAddress, [ { unit: "lovelace", quantity: String(changeAmount) }, { unit: identifierTokenUnit, quantity: "1" } ])
         .txOutInlineDatumValue(depositDatum)
         // send loan NFT and loan tokens to borrower
-        .txOut(walletAddress, [ { unit: loanNftUnit, quantity: "1" }, { unit: mintLoanUnit, quantity: String(loanAmount) }])
+        .txOut(walletAddress, [ { unit: loanNftUnit, quantity: "1" }, { unit: mintLoanUnit, quantity: tUSDLoanAmount }])
         .readOnlyTxInReference(oracleUtxo.input.txHash, oracleUtxo.input.outputIndex)
         .readOnlyTxInReference(protocolParametersUtxo.input.txHash, protocolParametersUtxo.input.outputIndex)
         // use collateral ADA for failed transactions from user's wallet address

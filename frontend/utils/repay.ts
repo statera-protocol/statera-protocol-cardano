@@ -1,5 +1,6 @@
-import { applyParamsToScript, builtinByteString, IWallet, MaestroProvider, mConStr0, mConStr1, MeshTxBuilder, outputReference, UTxO } from "@meshsdk/core";
+import { applyParamsToScript, builtinByteString, IWallet, MaestroProvider, mConStr0, mConStr1, mConStr3, MeshTxBuilder, outputReference, UTxO } from "@meshsdk/core";
 import { getLoanPositionDetails } from "./getLoanPositions";
+import { cVRSTxHash, cVRSTxIndex, mintLoanScriptTxHash, mintLoanScriptTxIndex } from "./setup";
 
 export const repayLoan = async (
     blockchainProvider: MaestroProvider,
@@ -8,17 +9,18 @@ export const repayLoan = async (
     walletAddress: string,
     walletCollateral: UTxO,
     walletUtxos: UTxO[],
-    collateralValidatorScript: string,
+    walletVK: string,
     collateralValidatorAddress: string,
     loanNftValidatorCode: any,
     oracleUtxo: UTxO | undefined,
     mintLoanAssetNameHex: string,
     mintLoanPolicyId: string,
-    mintLoanValidatorScript: string,
     collateralValidatorScriptHash: string,
     protocolParametersScriptHash: string,
     oracleScriptHash: string,
     collateralUtxo: UTxO,
+    userDepositUtxos: UTxO[],
+    identifierTokenUnit: string,
 ) => {
     if (!oracleUtxo) {
         throw new Error('Oracle UTxO not found!');
@@ -79,17 +81,32 @@ export const repayLoan = async (
       "JSON"
     );
 
-    // Collateral validator reference script info
-    const cVRSTxHash = "e0e4066d4356a6f7f5372985bc591f219c4839064f499daca2d771bdfe47383f";
-    const cVRSTxIndex = 0;
+    const userBalanceDatum = mConStr1([
+        walletVK
+    ]);
+    // Add lovelace quantity of user balance to the collateral amount (first asset is always ADA)
+    const userBalanceUpdated = Number(userDepositUtxos[0].output.amount[0].quantity) + Number(collateralUtxo.output.amount[0].quantity);
 
     const unsignedTx = await txBuilder
+        // loan NFT input from user's wallet
         .txIn(
             loanNftUtxo.input.txHash,
             loanNftUtxo.input.outputIndex,
             loanNftUtxo.output.amount,
             loanNftUtxo.output.address,
         )
+        // user's balance utxo in the protocol
+        .spendingPlutusScriptV3()
+        .txIn(
+            userDepositUtxos[0].input.txHash,
+            userDepositUtxos[0].input.outputIndex,
+            userDepositUtxos[0].output.amount,
+            userDepositUtxos[0].output.address,
+        )
+        .spendingTxInReference(cVRSTxHash, cVRSTxIndex)
+        .spendingReferenceTxInInlineDatumPresent()
+        .spendingReferenceTxInRedeemerValue(mConStr3([]))
+        // collateral utxo containing the collateral the user locked
         .spendingPlutusScriptV3()
         .txIn(
             collateralUtxo.input.txHash,
@@ -100,27 +117,32 @@ export const repayLoan = async (
         .spendingTxInReference(cVRSTxHash, cVRSTxIndex)
         .spendingReferenceTxInInlineDatumPresent()
         .spendingReferenceTxInRedeemerValue(mConStr0([]))
+        // burns the loan NFT
         .mintPlutusScriptV3()
         .mint("-1", userLoanNFTUnit.slice(0, 56), userLoanNFTUnit.slice(56))
         .mintingScript(recLoanNftValidatorScript)
         .mintRedeemerValue(mConStr1([]))
+        // burns the loan tokens (stable coin)
         .mintPlutusScriptV3()
         .mint("-".concat(String(tusd_borrowed)), mintLoanPolicyId, mintLoanAssetNameHex)
-        .mintingScript(mintLoanValidatorScript)
+        .mintTxInReference(mintLoanScriptTxHash, mintLoanScriptTxIndex)
         .mintRedeemerValue(mConStr1([]))
-        .txOut(walletAddress, collateralUtxo.output.amount)
+        // send updated user balance (with the unlocked collateral amount)
+        .txOut(collateralValidatorAddress, [{ unit: "lovelace", quantity: String(userBalanceUpdated) }, { unit: identifierTokenUnit, quantity: "1" }])
+        .txOutInlineDatumValue(userBalanceDatum)
         .txInCollateral(
             walletCollateral.input.txHash,
             walletCollateral.input.outputIndex,
             walletCollateral.output.amount,
             walletCollateral.output.address,
         )
+        .requiredSignerHash(walletVK)
         .changeAddress(walletAddress)
         .selectUtxosFrom(walletUtxos)
         .complete()
-    
+
     const signedTx = await wallet.signTx(unsignedTx);
     const txHash = await wallet.submitTx(signedTx);
-    
+
     console.log('Repayment tx hash:', txHash);
 }

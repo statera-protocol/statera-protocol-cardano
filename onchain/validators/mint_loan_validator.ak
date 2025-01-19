@@ -1,10 +1,11 @@
 use aiken/collection/dict
+use aiken/collection/list
 use aiken/crypto.{ScriptHash}
 use cardano/address.{Address, Script}
 use cardano/assets.{PolicyId, Value, from_asset, from_lovelace}
 use cardano/transaction.{InlineDatum, Input, Output, Transaction, placeholder}
-use halalend/datums.{CollateralDatum}
-use halalend/utils.{find_input_by_hash, find_output_by_hash}
+use halalend/datums.{CollateralDatum, CollateralValidatorDatum}
+use halalend/utils.{find_input_by_hash}
 use mocktail/virgin_key_hash.{mock_policy_id, mock_script_hash}
 use mocktail/virgin_output_reference.{mock_utxo_ref}
 
@@ -40,7 +41,29 @@ fn validate_get_loan(
   policy_id: PolicyId,
 ) {
   expect Some(collateral_output) =
-    find_output_by_hash(outputs, collateral_validator_hash)
+    list.find(
+      outputs,
+      fn(output) {
+        and {
+          trace @"collateral_validator_hash": collateral_validator_hash
+          (output.address.payment_credential == Script(
+            collateral_validator_hash,
+          ))?,
+          when output.datum is {
+            InlineDatum(output_datum) ->
+              if output_datum is CollateralValidatorDatum {
+                when output_datum is {
+                  CollateralDatum { .. } -> True
+                  _ -> False
+                }
+              } else {
+                False
+              }
+            _ -> False
+          },
+        }
+      },
+    )
 
   expect InlineDatum(collateral_output_datum) = collateral_output.datum
 
