@@ -13,6 +13,7 @@ import { getLoanPositionDetails, getLoanPositions } from "../../utils/getLoanPos
 import { repayLoan } from "../../utils/repay";
 import { withdraw } from "../../utils/withdraw";
 import { partialWithdraw } from "../../utils/partialWithdraw";
+import { increaseCollateral } from "../../utils/increaseCollateral";
 
 type DappStateType = {
   walletUtxos: UTxO[],
@@ -55,7 +56,7 @@ export default function Home() {
   const [addDepositAmount, setAddDepositAmount] = useState<string>("");
   const [increaseDepositAmount, setIncreaseDepositAmount] = useState<string>("");
   const [borrowAmount, setBorrowAmount] = useState<string>("");
-  // const [loanAmount, setLoanAmount] = useState(0);
+  const [increaseCollateralAmount, setIncreaseCollateralAmount] = useState<string>("");
   const [loanPositions, setloanPositions] = useState<UTxO[]>([]);
   const [loanPositionsDisplay, setloanPositionsDisplay] = useState<number>(0);
   const [partialWithdrawAmount, setPartialWithdrawAmount] = useState<string>("");
@@ -313,6 +314,40 @@ export default function Home() {
     setPartialWithdrawAmount("");
   }
 
+  const handleIncreaseCollateral = async (loanPosition: UTxO) => {
+    if (!DappState) {
+      throw new Error("Dapp state isn't initialized");
+    }
+
+    const {
+      txBuilder,
+      walletAddress,
+      walletCollateral,
+      walletUtxos,
+      walletVK,
+      collateralValidatorAddress,
+      collateralValidatorScript,
+      userDepositUtxos,
+      identifierTokenUnit,
+    } = DappState;
+    await increaseCollateral(
+      txBuilder,
+      wallet,
+      walletAddress,
+      walletCollateral,
+      walletUtxos,
+      walletVK,
+      collateralValidatorAddress,
+      collateralValidatorScript,
+      userDepositUtxos,
+      loanPosition,
+      increaseCollateralAmount,
+      identifierTokenUnit,
+    );
+
+    setIncreaseCollateralAmount("");
+  }
+
   return (
     <div className="bg-gray-900 w-full text-white text-center">
       <Head>
@@ -399,7 +434,7 @@ export default function Home() {
               <h3 className="mb-6 mt-12 text-4xl font-bold">Borrow Fundz</h3>
               <p>Your account balance of<span> </span>
                 <i>{`${(Number(DappState.userDepositUtxos[0].output.amount[0].quantity) / 1000000)} ADA`}</i><span> </span>
-                can get you a maximum loan of <i>{getLoanAmount(DappState.userDepositUtxos[0].output.amount[0].quantity).loanAmount} tUSD</i>
+                can get you a maximum loan of <i>{Math.floor(getLoanAmount(DappState.userDepositUtxos[0].output.amount[0].quantity).loanAmount)} tUSD</i>
                 <br />
                 Note: You can borrow a minimum of <i>100</i> tUSD
               </p>
@@ -451,6 +486,25 @@ export default function Home() {
                       >
                         Repay Loan
                       </Button>
+                      <p className="font-semibold">Increase Collateral:</p>
+                      <Input
+                        type="text"
+                        name="increaseCollateralAmount"
+                        id="increaseCollateralAmount"
+                        value={increaseCollateralAmount}
+                        onInput={(e) => setIncreaseCollateralAmount(e.currentTarget.value)}
+                      >
+                        Put in increase amount (ADA)
+                      </Input>
+                      {/* <p>Equivalent loan amount in tUSD (Make sure this is a whole number): <i>{loanAmount}</i></p> */}
+                      <Button
+                        className="my-4"
+                        onClick={() => handleIncreaseCollateral(loanPosition)}
+                        disabled={!increaseCollateralAmount}
+                      >
+                        Increase Collateral
+                      </Button>
+                      <hr />
                     </li>
                     )
                   })}

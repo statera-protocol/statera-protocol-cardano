@@ -81,7 +81,6 @@ fn validate_mint_borrow_nft(
       outputs,
       fn(output) {
         and {
-          trace @"collateral_validator_hash": collateral_validator_hash
           (output.address.payment_credential == Script(
             collateral_validator_hash,
           ))?,
@@ -254,9 +253,6 @@ fn validate_protocol_parameters(
 
   let is_rate_and_mcr_valid =
     hundred_percent_lovelace_value >= expected_borrow_lovelace
-  trace @"hundred_percent_lovelace_value": hundred_percent_lovelace_value
-  trace @"expected_borrow_lovelace": expected_borrow_lovelace
-  trace @"oracle_lovelace_usd_rate": oracle_lovelace_usd_rate
 
   let is_rate_in_datum_valid =
     oracle_usd_lovelace_rate == collateral_rate_in_lovelace

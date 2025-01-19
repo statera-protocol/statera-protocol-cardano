@@ -4,10 +4,10 @@ import { DepositDatum } from "./util";
 import blueprint from "../../onchain/plutus.json" with { type: "json" };
 
 // Collateral validator reference script info
-const cVRSTxHash = "d5c842db681ec6a85fc02c1e6ebf46d98256754916bd4c1ef9212b230712986b";
+const cVRSTxHash = "be8ef37234e90506eba2726c3ebf201d8b328dea26ec3bd37b54e42f9d80f0b3";
 const cVRSTxIndex = 0;
 // Mint Loan validator reference script info
-const mintLoanScriptTxHash = "bb8686e88104b47cce663a942604a219a5aa4816f39e108910c5b06f750ba29d";
+const mintLoanScriptTxHash = "00c8b67d31238a28bf7611c9b1722d910dfb6e4c5e036a369bb0f09c060d2d34";
 const mintLoanScriptTxIndex = 0;
 
 export const setup = async (blockchainProvider: MaestroProvider, walletUtxos: UTxO[], walletVK: string) => {

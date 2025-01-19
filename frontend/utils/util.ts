@@ -6,6 +6,7 @@ type CollateralDatum = ConStr0<[
     BuiltinByteString,
     Integer,
     BuiltinByteString,
+    BuiltinByteString,
     Integer,
     BuiltinByteString,
     Integer,

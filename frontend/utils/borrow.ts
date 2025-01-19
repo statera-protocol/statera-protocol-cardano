@@ -49,6 +49,7 @@ export const borrow = async (
         mintLoanAssetNameHex,
         Number(tUSDLoanAmount),
         loanNftPolicyId,
+        loanNftNameHex,
         Math.ceil(oracleRate * 1000000), // USD multiplied by ADA lovelaces bcs no decimals in blockhain
         "ada",
         Number(loanAmountAda),

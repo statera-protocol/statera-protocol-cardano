@@ -417,7 +417,6 @@ fn handle_withdraw_and_increase_deposit(
           outputs,
           fn(output) {
             and {
-              trace @"own_hash": own_hash
               (output.address.payment_credential == Script(own_hash))?,
               when output.datum is {
                 InlineDatum(output_datum) ->
@@ -457,21 +456,6 @@ fn handle_withdraw_and_increase_deposit(
             ))?,
           }
         PartialWithdrawal -> {
-          // Expect an output to the depositor vkh whose lovelace value is the exact withdrawal amount
-          expect Some(_withdrawal_output) =
-            outputs
-              |> list.find(
-                  fn(output) {
-                    and {
-                      output.address.payment_credential == VerificationKey(
-                        depositor_vkh,
-                      ),
-                      lovelace_of(output.value) == lovelace_of(
-                        own_input.output.value,
-                      ) - lovelace_of(deposit_output.value),
-                    }
-                  },
-                )
           and {
             // To allow for partial withdrawal, final balance has to be less than initial balance
             (lovelace_of(deposit_output.value) < lovelace_of(
@@ -1030,6 +1014,15 @@ test test_increase_collateral() {
       extra_signatories: [depositor_vkh],
     }
 
+  collateral_validator.spend(
+    protocol_parameters_script_hash,
+    oracle_script_hash,
+    liquidated_funds_collector_script_hash,
+    Some(deposit_datum),
+    PartialWithdrawal,
+    mock_utxo_ref(0, 9),
+    tx,
+  ) &&
   collateral_validator.spend(
     protocol_parameters_script_hash,
     oracle_script_hash,

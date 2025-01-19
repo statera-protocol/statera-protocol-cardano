@@ -7,3 +7,4 @@
 # After changing all validators:
 - create new oracle utxo
 - create new reference script for collateral validator script
+- create new reference script for mint loan validator script

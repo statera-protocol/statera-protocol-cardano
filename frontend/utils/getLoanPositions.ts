@@ -54,8 +54,9 @@ export const getLoanPositionDetails = (loanPosition: UTxO) => {
         tusd_asset_name: datum.fields[2].bytes,
         tusd_borrowed: datum.fields[3].int,
         loan_nft_pid: datum.fields[4].bytes,
-        collateral_rate_in_lovelace: datum.fields[5].int,
-        collateral_asset: datum.fields[6].bytes,
-        collateral_amount_in_lovelace: datum.fields[7].int,
+        loan_nft_asset_name: datum.fields[5].bytes,
+        collateral_rate_in_lovelace: datum.fields[6].int,
+        collateral_asset: datum.fields[7].bytes,
+        collateral_amount_in_lovelace: datum.fields[8].int,
     }
 }
