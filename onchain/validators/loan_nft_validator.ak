@@ -418,6 +418,7 @@ test test_borrow_with_right_values() {
   let test_usd_policy_id = mock_policy_id(9)
   let test_usd_asset_name = "tUSD"
   let collateral_amount_in_lovelace = borrow_lovelace_amount
+  let loan_nft_name = "BorrowNFT1"
   let collateral_validator_output =
     Output {
       address: Address {
@@ -432,6 +433,7 @@ test test_borrow_with_right_values() {
           tusd_asset_name: test_usd_asset_name,
           tusd_borrowed: 12,
           loan_nft_pid: loan_nft_policy_id,
+          loan_nft_asset_name: loan_nft_name,
           // $1.2 (per ADA)
           collateral_rate_in_lovelace: 1200000,
           collateral_asset: "ada",
@@ -471,7 +473,7 @@ test test_borrow_with_right_values() {
       // of ADA in 15 ADA (normal - 10 ADA) @ $1.2 USD per ADA rate
       value: assets.merge(
         from_asset(test_usd_policy_id, test_usd_asset_name, 12),
-        from_asset(loan_nft_policy_id, "BorrowNFT1", 1),
+        from_asset(loan_nft_policy_id, loan_nft_name, 1),
       ),
       datum: NoDatum,
       reference_script: None,
@@ -480,7 +482,7 @@ test test_borrow_with_right_values() {
   let mint =
     from_asset_list(
       [
-        Pair(loan_nft_policy_id, [Pair("BorrowNFT1", 1)]),
+        Pair(loan_nft_policy_id, [Pair(loan_nft_name, 1)]),
         Pair(test_usd_policy_id, [Pair("tUSD", 12)]),
       ],
     )
@@ -516,6 +518,7 @@ test test_repay_loan_burn_nft_with_right_values() {
   let test_usd_policy_id = mock_policy_id(9)
   let test_usd_asset_name = "tUSD"
   let collateral_amount_in_lovelace = 15000000
+  let loan_nft_name = "BorrowNFT1"
   let collateral_input =
     Input {
       output_reference: mock_utxo_ref(0, 1),
@@ -532,6 +535,7 @@ test test_repay_loan_burn_nft_with_right_values() {
             tusd_asset_name: test_usd_asset_name,
             tusd_borrowed: 12,
             loan_nft_pid: loan_nft_policy_id,
+            loan_nft_asset_name: loan_nft_name,
             // $1.2 (per ADA)
             collateral_rate_in_lovelace: 1200000,
             collateral_asset: "ada",
@@ -551,7 +555,7 @@ test test_repay_loan_burn_nft_with_right_values() {
       assets.merge(
         // assumed minimum ada value for a utxo
         from_lovelace(2000000),
-        from_asset(loan_nft_policy_id, "BorrowNFT1", 1),
+        from_asset(loan_nft_policy_id, loan_nft_name, 1),
       ),
       loan_refund_value,
     )
@@ -616,7 +620,7 @@ test test_repay_loan_burn_nft_with_right_values() {
 
   let mint =
     assets.merge(
-      from_asset(loan_nft_policy_id, "BorrowNFT1", -1),
+      from_asset(loan_nft_policy_id, loan_nft_name, -1),
       from_asset(test_usd_policy_id, "tUSD", -12),
     )
 

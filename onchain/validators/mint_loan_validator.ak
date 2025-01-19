@@ -124,6 +124,7 @@ test test_mint_loan_tokens() {
   // mock_policy_id(x)
   let test_usd_asset_name = "tUSD"
   let collateral_amount_in_lovelace = 15000000
+  let loan_nft_name = "BorrowNFT1"
   let collateral_validator_output =
     Output {
       address: Address {
@@ -138,6 +139,7 @@ test test_mint_loan_tokens() {
           tusd_asset_name: test_usd_asset_name,
           tusd_borrowed: 12,
           loan_nft_pid: loan_nft_policy_id,
+          loan_nft_asset_name: loan_nft_name,
           // $1.2 (per ADA)
           collateral_rate_in_lovelace: 1200000,
           collateral_asset: "ada",
@@ -172,6 +174,7 @@ test test_burn_loan_tokens() {
   // mock_policy_id(x)
   let test_usd_asset_name = "tUSD"
   let collateral_amount_in_lovelace = 15000000
+  let loan_nft_name = "BorrowNFT1"
   let collateral_validator_input =
     Input {
       output_reference: mock_utxo_ref(0, 0),
@@ -188,6 +191,7 @@ test test_burn_loan_tokens() {
             tusd_asset_name: test_usd_asset_name,
             tusd_borrowed: 12,
             loan_nft_pid: loan_nft_policy_id,
+            loan_nft_asset_name: loan_nft_name,
             // $1.2 (per ADA)
             collateral_rate_in_lovelace: 1200000,
             collateral_asset: "ada",
