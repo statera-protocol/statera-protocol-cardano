@@ -55,9 +55,14 @@ export const repayLoan = async (
     console.log("userLoanNFTUnit:", userLoanNFTUnit);
     console.log("collateralUtxo:", collateralUtxo);
 
+    // Get loan NFT asset details
+    const loanNFTData = await blockchainProvider.get(
+        "assets/" + userLoanNFTUnit
+    );
+    const loanNFTTxHash = loanNFTData.data.first_mint_tx.tx_hash;
     // Get the collateral utxo transaction data
     const txData = await blockchainProvider.get(
-        "transactions/" + collateralUtxo.input.txHash,
+        "transactions/" + loanNFTTxHash,
     );
     // Get the utxo to use to reconstruct the loanNftValidatorScript
     const LnvsUtxo = (txData.data.inputs.filter((input: any) => (

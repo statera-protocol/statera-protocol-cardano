@@ -7,7 +7,7 @@ import blueprint from "../../onchain/plutus.json" with { type: "json" };
 const cVRSTxHash = "be8ef37234e90506eba2726c3ebf201d8b328dea26ec3bd37b54e42f9d80f0b3";
 const cVRSTxIndex = 0;
 // Mint Loan validator reference script info
-const mintLoanScriptTxHash = "00c8b67d31238a28bf7611c9b1722d910dfb6e4c5e036a369bb0f09c060d2d34";
+const mintLoanScriptTxHash = "6c6dc79b7dd4bd662c0f8f68622efb63dd1a40dbbf2437930d646d341d4fae3b";
 const mintLoanScriptTxIndex = 0;
 
 export const setup = async (blockchainProvider: MaestroProvider, walletUtxos: UTxO[], walletVK: string) => {

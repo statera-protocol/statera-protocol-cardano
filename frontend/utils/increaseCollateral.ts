@@ -128,5 +128,5 @@ export const increaseCollateral = async (
     const signedTx = await wallet.signTx(unsignedTx);
     const txHash = await wallet.submitTx(signedTx);
 
-    console.log("Partial withdraw txHash:", txHash);
+    console.log("Increase collateral txHash:", txHash);
 }

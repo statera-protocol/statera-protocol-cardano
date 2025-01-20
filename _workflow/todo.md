@@ -5,4 +5,5 @@
 - Depending on either single loan position or multiple loan positions, make deposit use withrawDeposit or partialWithdrawal
 
 <!-- RECOMMENDED CHANGES -->
-- Confirm only one outputs and inputs of user balance and collateral utxos: Use list.filter and confirm only one element.
+- Confirm only one outputs and inputs of user balance and collateral utxos: Use list.filter and confirm only one element
+- Reset `meshTxBuilder` on both tx failure and success

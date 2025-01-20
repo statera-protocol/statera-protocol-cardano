@@ -276,7 +276,25 @@ fn validate_burn_borrow_nft(
   collateral_validator_hash: ScriptHash,
 ) {
   expect Some(collateral_input) =
-    find_input_by_hash(inputs, collateral_validator_hash)
+    list.find(
+      inputs,
+      fn(input) {
+        and {
+          (input.output.address.payment_credential == Script(
+            collateral_validator_hash,
+          ))?,
+          when input.output.datum is {
+            InlineDatum(input_datum) ->
+              if input_datum is CollateralDatum { .. }: CollateralValidatorDatum {
+                True
+              } else {
+                False
+              }
+            _ -> False
+          },
+        }
+      },
+    )
 
   expect InlineDatum(collateral_input_datum) = collateral_input.output.datum
 

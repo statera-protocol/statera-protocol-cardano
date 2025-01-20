@@ -5,7 +5,6 @@ use cardano/address.{Address, Script}
 use cardano/assets.{PolicyId, Value, from_asset, from_lovelace}
 use cardano/transaction.{InlineDatum, Input, Output, Transaction, placeholder}
 use halalend/datums.{CollateralDatum, CollateralValidatorDatum}
-use halalend/utils.{find_input_by_hash}
 use mocktail/virgin_key_hash.{mock_policy_id, mock_script_hash}
 use mocktail/virgin_output_reference.{mock_utxo_ref}
 
@@ -45,17 +44,13 @@ fn validate_get_loan(
       outputs,
       fn(output) {
         and {
-          trace @"collateral_validator_hash": collateral_validator_hash
           (output.address.payment_credential == Script(
             collateral_validator_hash,
           ))?,
           when output.datum is {
             InlineDatum(output_datum) ->
-              if output_datum is CollateralValidatorDatum {
-                when output_datum is {
-                  CollateralDatum { .. } -> True
-                  _ -> False
-                }
+              if output_datum is CollateralDatum { .. }: CollateralValidatorDatum {
+                True
               } else {
                 False
               }
@@ -102,7 +97,25 @@ fn validate_repay_loan(
   policy_id: PolicyId,
 ) {
   expect Some(collateral_input) =
-    find_input_by_hash(inputs, collateral_validator_hash)
+    list.find(
+      inputs,
+      fn(input) {
+        and {
+          (input.output.address.payment_credential == Script(
+            collateral_validator_hash,
+          ))?,
+          when input.output.datum is {
+            InlineDatum(input_datum) ->
+              if input_datum is CollateralDatum { .. }: CollateralValidatorDatum {
+                True
+              } else {
+                False
+              }
+            _ -> False
+          },
+        }
+      },
+    )
 
   expect InlineDatum(collateral_input_datum) = collateral_input.output.datum
 
