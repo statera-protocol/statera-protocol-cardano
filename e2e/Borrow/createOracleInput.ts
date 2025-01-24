@@ -1,4 +1,4 @@
-import { mConStr2 } from "@meshsdk/core";
+import { mConStr2, mConStr3 } from "@meshsdk/core";
 import { txBuilder, wallet1, wallet1Address, wallet1Collateral, wallet1Utxos } from "../setup.js";
 import { mintLoanAssetNameHex, mintLoanScriptHash, mintLoanUnit, mintLoanValidatorScript, oracleAddress } from "./setup.js";
 
@@ -8,7 +8,7 @@ const unsignedTx = await txBuilder
     .mintPlutusScriptV3()
     .mint(mintQuantity, mintLoanScriptHash, mintLoanAssetNameHex)
     .mintingScript(mintLoanValidatorScript)
-    .mintRedeemerValue(mConStr2([]))
+    .mintRedeemerValue(mConStr3([]))
     // Normal rate
     .txOut(oracleAddress, [{ unit: "lovelace", quantity: "20000000" }, { unit: mintLoanUnit, quantity: mintQuantity }])
     // For liquidation

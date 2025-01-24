@@ -14,6 +14,7 @@ import { repayLoan } from "../../utils/repay";
 import { withdraw } from "../../utils/withdraw";
 import { partialWithdraw } from "../../utils/partialWithdraw";
 import { increaseCollateral } from "../../utils/increaseCollateral";
+import { partialRepay } from "../../utils/partialRepayment";
 
 type DappStateType = {
   walletUtxos: UTxO[],
@@ -56,10 +57,11 @@ export default function Home() {
   const [addDepositAmount, setAddDepositAmount] = useState<string>("");
   const [increaseDepositAmount, setIncreaseDepositAmount] = useState<string>("");
   const [borrowAmount, setBorrowAmount] = useState<string>("");
-  const [increaseCollateralAmount, setIncreaseCollateralAmount] = useState<string>("");
   const [loanPositions, setloanPositions] = useState<UTxO[]>([]);
   const [loanPositionsDisplay, setloanPositionsDisplay] = useState<number>(0);
   const [partialWithdrawAmount, setPartialWithdrawAmount] = useState<string>("");
+  const [increaseCollateralAmount, setIncreaseCollateralAmount] = useState<string>("");
+  const [partialRepayAmount, setPartialRepayAmount] = useState<string>("");
 
   const handleOnConnected = async () => {
     const gottenDappState = await configureApp(wallet);
@@ -326,7 +328,6 @@ export default function Home() {
       walletUtxos,
       walletVK,
       collateralValidatorAddress,
-      collateralValidatorScript,
       userDepositUtxos,
       identifierTokenUnit,
     } = DappState;
@@ -338,7 +339,6 @@ export default function Home() {
       walletUtxos,
       walletVK,
       collateralValidatorAddress,
-      collateralValidatorScript,
       userDepositUtxos,
       loanPosition,
       increaseCollateralAmount,
@@ -346,6 +346,36 @@ export default function Home() {
     );
 
     setIncreaseCollateralAmount("");
+  }
+
+  const handlePartialRepay = async (loanPosition: UTxO) => {
+    if (!DappState) {
+      throw new Error("Dapp state isn't initialized");
+    }
+
+    const {
+      txBuilder,
+      walletAddress,
+      walletCollateral,
+      walletUtxos,
+      collateralValidatorAddress,
+      mintLoanPolicyId,
+      mintLoanAssetNameHex,
+    } = DappState;
+    await partialRepay(
+      txBuilder,
+      wallet,
+      walletAddress,
+      walletCollateral,
+      walletUtxos,
+      collateralValidatorAddress,
+      loanPosition,
+      mintLoanPolicyId,
+      mintLoanAssetNameHex,
+      partialRepayAmount,
+    );
+
+    setPartialRepayAmount("");
   }
 
   return (
@@ -503,6 +533,24 @@ export default function Home() {
                         disabled={!increaseCollateralAmount}
                       >
                         Increase Collateral
+                      </Button>
+                      <p className="font-semibold">Partial Repay:</p>
+                      <Input
+                        type="text"
+                        name="partialRepayAmount"
+                        id="partialRepayAmount"
+                        value={partialRepayAmount}
+                        onInput={(e) => setPartialRepayAmount(e.currentTarget.value)}
+                      >
+                        Put in tUSD amount to Repay
+                      </Input>
+                      {/* <p>Equivalent loan amount in tUSD (Make sure this is a whole number): <i>{loanAmount}</i></p> */}
+                      <Button
+                        className="my-4"
+                        onClick={() => handlePartialRepay(loanPosition)}
+                        disabled={!partialRepayAmount}
+                      >
+                        Partial Repay
                       </Button>
                       <hr />
                     </li>

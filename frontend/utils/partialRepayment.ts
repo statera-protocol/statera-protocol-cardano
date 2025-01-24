@@ -1,22 +1,22 @@
-import { IWallet, mConStr, mConStr0, mConStr1, mConStr3, MeshTxBuilder, stringToHex, UTxO } from "@meshsdk/core";
+import { IWallet, mConStr, mConStr0, mConStr1, mConStr2, mConStr3, MeshTxBuilder, stringToHex, UTxO } from "@meshsdk/core";
 import { getLoanPositionDetails } from "./getLoanPositions";
-import { cVRSTxHash, cVRSTxIndex } from "./setup";
+import { cVRSTxHash, cVRSTxIndex, mintLoanScriptTxHash, mintLoanScriptTxIndex } from "./setup";
 
-export const increaseCollateral = async (
+export const partialRepay = async (
     txBuilder: MeshTxBuilder,
     wallet: IWallet,
     walletAddress: string,
     walletCollateral: UTxO,
     walletUtxos: UTxO[],
-    walletVK: string,
     collateralValidatorAddress: string,
-    userDepositUtxos: UTxO[],
     collateralUtxo: UTxO,
-    increaseAmountInt: string | undefined,
-    identifierTokenUnit: string,
+    mintLoanPolicyId: string,
+    mintLoanAssetNameHex: string,
+    repayAmount: string | undefined,
 ) => {
-    const balanceAmountInt = (Number(userDepositUtxos[0].output.amount[0].quantity) - (Number(increaseAmountInt) * 1000000));
-    const balanceAmount = String(balanceAmountInt);
+    if (!repayAmount) {
+        throw new Error('Repay amount not provided');
+    }
 
     const collateralUtxoDetails = getLoanPositionDetails(collateralUtxo);
     if (!collateralUtxoDetails) {
@@ -31,6 +31,7 @@ export const increaseCollateral = async (
         loan_nft_asset_name,
         collateral_rate_in_lovelace,
         collateral_asset,
+        collateral_amount_in_lovelace,
     } = collateralUtxoDetails;
 
     let userLoanNFTUnit = "";
@@ -56,22 +57,21 @@ export const increaseCollateral = async (
     console.log("userLoanNFTUnit:", userLoanNFTUnit);
     console.log("collateralUtxo:", collateralUtxo);
 
-    const updatedCollateralAmount = String(Number(collateralUtxo.output.amount[0].quantity) + (Number(increaseAmountInt) * 1000000));
-
-    const userBalanceDatum = mConStr1([
-        walletVK
-    ]);
+    const updatedTusdBorrowed = Number(tusd_borrowed) - Number(repayAmount)
+    console.log('tusd_borrowed:', Number(tusd_borrowed));
+    console.log('repayAmount:', Number(repayAmount));
+    console.log('updatedTusdBorrowed:', Number(updatedTusdBorrowed));
 
     const updatedCollateralDatum = mConStr0([
         tusd_pool_hash,
         tusd_policy_id,
         tusd_asset_name,
-        tusd_borrowed,
+        updatedTusdBorrowed,
         loan_nft_pid,
         loan_nft_asset_name,
         collateral_rate_in_lovelace,
         collateral_asset,
-        Number(updatedCollateralAmount),
+        collateral_amount_in_lovelace,
     ]);
 
     const unsignedTx = await txBuilder
@@ -82,17 +82,6 @@ export const increaseCollateral = async (
             loanNftUtxo.output.amount,
             loanNftUtxo.output.address,
         )
-        // user balance input
-        .spendingPlutusScriptV3()
-        .txIn(
-            userDepositUtxos[0].input.txHash,
-            userDepositUtxos[0].input.outputIndex,
-            userDepositUtxos[0].output.amount,
-            userDepositUtxos[0].output.address,
-        )
-        .spendingTxInReference(cVRSTxHash, cVRSTxIndex)
-        .spendingReferenceTxInInlineDatumPresent()
-        .spendingReferenceTxInRedeemerValue(mConStr(4, []))
         // collateral utxo containing the collateral the user locked
         .spendingPlutusScriptV3()
         .txIn(
@@ -103,15 +92,17 @@ export const increaseCollateral = async (
         )
         .spendingTxInReference(cVRSTxHash, cVRSTxIndex)
         .spendingReferenceTxInInlineDatumPresent()
-        .spendingReferenceTxInRedeemerValue(mConStr(5, []))
-        // updated user balance output
-        .txOut(collateralValidatorAddress, [{ unit: "lovelace", quantity: balanceAmount }, { unit: identifierTokenUnit, quantity: "1" }])
-        .txOutInlineDatumValue(userBalanceDatum)
+        .spendingReferenceTxInRedeemerValue(mConStr(6, []))
+        // burn partial repay amount
+        .mintPlutusScriptV3()
+        .mint("-".concat(String(repayAmount)), mintLoanPolicyId, mintLoanAssetNameHex)
+        .mintTxInReference(mintLoanScriptTxHash, mintLoanScriptTxIndex)
+        .mintRedeemerValue(mConStr2([]))
         // updated collateral output
-        .txOut(collateralValidatorAddress, [{ unit: "lovelace", quantity: updatedCollateralAmount }])
+        .txOut(collateralValidatorAddress, collateralUtxo.output.amount)
         .txOutInlineDatumValue(updatedCollateralDatum)
         // user wallet output
-        .txOut(walletAddress, loanNftUtxo.output.amount)
+        .txOut(walletAddress, [ { unit: (loan_nft_pid + loan_nft_asset_name), quantity: "1" } ])
         .txInCollateral(
             walletCollateral.input.txHash,
             walletCollateral.input.outputIndex,
@@ -119,12 +110,11 @@ export const increaseCollateral = async (
             walletCollateral.output.address,
         )
         .changeAddress(walletAddress)
-        .requiredSignerHash(walletVK)
         .selectUtxosFrom(walletUtxos)
         .complete()
 
     const signedTx = await wallet.signTx(unsignedTx);
     const txHash = await wallet.submitTx(signedTx);
 
-    console.log("Increase collateral txHash:", txHash);
+    console.log("Partial repayment txHash:", txHash);
 }
