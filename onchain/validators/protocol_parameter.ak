@@ -4,10 +4,14 @@ use cardano/assets.{zero}
 use cardano/transaction.{
   InlineDatum, Input, Output, OutputReference, Transaction, placeholder,
 }
-use halalend/datums.{ProtocolParametersDatum}
-use halalend/utils.{find_input, signed_by}
-use mocktail/virgin_key_hash.{mock_pub_key_hash}
+use mocktail/virgin_key_hash.{mock_policy_id, mock_pub_key_hash}
 use mocktail/virgin_output_reference.{mock_utxo_ref}
+use statera/datums.{ProtocolParametersDatum}
+use statera/types.{AssetType}
+use statera/utils.{find_input, signed_by}
+
+// use aiken/primitive/string.{from_bytearray}
+// use aiken/primitive/bytearray.{from_string, to_hex, to_string}
 
 validator protocol_parameter(admin: VerificationKeyHash) {
   spend(
@@ -42,7 +46,19 @@ test test_spend_protocol_parameter_validator_utxo() {
       min_liquidation_threshold: 120,
       min_loan_amount: 100,
       protocol_usage_fee: 5,
-      collateral_assets: ["ada", "iUSD", "halalend", "hosky"],
+      collateral_assets: [
+        AssetType { is_stable: False, policy_id: "", asset_name: "lovelace" },
+        AssetType {
+          is_stable: True,
+          policy_id: mock_policy_id(0),
+          asset_name: "iUSD",
+        },
+        AssetType {
+          is_stable: False,
+          policy_id: mock_policy_id(1),
+          asset_name: "hosky",
+        },
+      ],
     }
   // 14 days in milliseconds
   let redeemer = ""

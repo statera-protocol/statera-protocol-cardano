@@ -2,6 +2,7 @@ use aiken/collection/list
 use aiken/crypto.{ScriptHash, VerificationKeyHash}
 use aiken/interval.{Finite, PositiveInfinity}
 use cardano/address.{Script, VerificationKey}
+use cardano/assets.{AssetName, PolicyId, quantity_of}
 use cardano/transaction.{Input, Output, OutputReference, ValidityRange}
 
 // validate that the transaction is signed by 'signer'
@@ -60,13 +61,13 @@ pub fn filter_inputs_by_vkh(inputs: List<Input>, vkh: VerificationKeyHash) {
   )
 }
 
-// /// Filters outputs by hash
-// pub fn filter_outputs_by_hash(outputs: List<Output>, script_hash: ScriptHash) {
-//   list.filter(
-//     outputs,
-//     fn(output) { output.address.payment_credential == Script(script_hash) },
-//   )
-// }
+/// Filters outputs by vkh
+pub fn filter_outputs_by_vkh(outputs: List<Output>, vkh: VerificationKeyHash) {
+  list.filter(
+    outputs,
+    fn(output) { output.address.payment_credential == VerificationKey(vkh) },
+  )
+}
 
 /// Finds an output by it's script hash
 pub fn find_output_by_hash(outputs: List<Output>, script_hash: ScriptHash) {
@@ -74,6 +75,45 @@ pub fn find_output_by_hash(outputs: List<Output>, script_hash: ScriptHash) {
     outputs,
     fn(output) { output.address.payment_credential == Script(script_hash) },
   )
+}
+
+/// Returns the amount of aggregated inputs and outputs quantity of a particular token for specific user
+pub fn get_user_asset_amt_in_out(
+  inputs: List<Input>,
+  outputs: List<Output>,
+  user_vkh: VerificationKeyHash,
+  ast_policy_id: PolicyId,
+  ast_asset_name: AssetName,
+) {
+  // get all inputs coming from user's wallet
+  let user_wallet_inputs = filter_inputs_by_vkh(inputs, user_vkh)
+  // get total asset input from user's wallet
+  let user_wallet_total_ast_in =
+    user_wallet_inputs
+      |> list.foldl(
+          0,
+          fn(input, asset_total) {
+            let asset_amount =
+              quantity_of(input.output.value, ast_policy_id, ast_asset_name)
+            asset_amount + asset_total
+          },
+        )
+
+  // find outputs going back to the user's wallet
+  let user_wallet_outputs = filter_outputs_by_vkh(outputs, user_vkh)
+  // get total asset output to user's wallet
+  let user_wallet_total_ast_out =
+    user_wallet_outputs
+      |> list.foldl(
+          0,
+          fn(output, asset_total) {
+            let asset_amount =
+              quantity_of(output.value, ast_policy_id, ast_asset_name)
+            asset_amount + asset_total
+          },
+        )
+
+  (user_wallet_total_ast_in, user_wallet_total_ast_out)
 }
 
 /// Get the borrower's loan term in milli seconds

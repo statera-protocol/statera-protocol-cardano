@@ -10,14 +10,13 @@ use cardano/transaction.{
   InlineDatum, Input, NoDatum, Output, OutputReference, Transaction, find_input,
   placeholder,
 }
-use halalend/constants.{
-  identifier_token_name, receipt_token_name, usd_with_lovelace_precision_factor,
-}
-use halalend/datums.{
+use statera/constants.{identifier_token_name, receipt_token_name}
+use statera/datums.{
   CollateralDatum, CollateralValidatorDatum, DepositorDatum,
   ProtocolParametersDatum,
 }
-use halalend/utils.{
+use statera/types.{AssetType}
+use statera/utils.{
   calculate_by_percentage, filter_inputs_by_vkh, find_input_by_hash,
   find_output_by_hash, find_output_by_vkh, signed_by,
 }
@@ -154,10 +153,10 @@ fn handle_collateral(
   inputs: List<Input>,
 ) {
   expect Some(CollateralDatum {
-    tusd_policy_id,
-    tusd_asset_name,
+    st_policy_id,
+    st_asset_name,
     loan_nft_pid,
-    collateral_rate_in_lovelace,
+    collateral_rate_at_lending_precised,
     ..
   }) = datum
 
@@ -173,10 +172,10 @@ fn handle_collateral(
         is_liquidation_threshold_reached(
           protocol_parameters_hash,
           oracle_hash,
-          collateral_rate_in_lovelace,
+          collateral_rate_at_lending_precised,
           reference_inputs,
-          tusd_policy_id,
-          tusd_asset_name,
+          st_policy_id,
+          st_asset_name,
         ),
         liquidated_funds_must_go_to_collector(
           outputs,
@@ -198,10 +197,10 @@ fn handle_collateral(
 fn is_liquidation_threshold_reached(
   protocol_parameters_hash: ScriptHash,
   oracle_hash: ScriptHash,
-  collateral_rate_in_lovelace: Int,
+  collateral_rate_at_lending_precised: Int,
   reference_inputs: List<Input>,
-  tusd_policy_id: PolicyId,
-  tusd_asset_name: AssetName,
+  st_policy_id: PolicyId,
+  st_asset_name: AssetName,
 ) {
   expect Some(protocol_parameters_ref) =
     find_input_by_hash(reference_inputs, protocol_parameters_hash)
@@ -219,13 +218,13 @@ fn is_liquidation_threshold_reached(
 
   let oracle_lovelace_value = lovelace_of(oracle_ref.output.value)
   let oracle_usd_value =
-    quantity_of(oracle_ref.output.value, tusd_policy_id, tusd_asset_name)
+    quantity_of(oracle_ref.output.value, st_policy_id, st_asset_name)
   let oracle_lovelace_usd_rate =
     oracle_usd_value * usd_with_lovelace_precision_factor / oracle_lovelace_value
 
   let liquidation_rate =
     calculate_by_percentage(
-      collateral_rate_in_lovelace,
+      collateral_rate_at_lending_precised,
       min_collateral_ratio,
       min_liquidation_threshold,
     )
@@ -325,28 +324,26 @@ fn handle_increase_collateral(
     )
 
   expect Some(CollateralDatum {
-    tusd_pool_hash,
-    tusd_policy_id,
-    tusd_asset_name,
-    tusd_borrowed,
+    st_policy_id,
+    st_asset_name,
+    st_borrowed,
     loan_nft_pid,
     loan_nft_asset_name,
-    collateral_rate_in_lovelace,
+    collateral_rate_at_lending_precised,
     collateral_asset,
-    collateral_amount_in_lovelace,
+    collateral_asset_amount,
   }) = datum
 
   expect InlineDatum(collateral_output_datum) = collateral_output.datum
   expect CollateralDatum {
-    tusd_pool_hash: output_tusd_pool_hash,
-    tusd_policy_id: output_tusd_policy_id,
-    tusd_asset_name: output_tusd_asset_name,
-    tusd_borrowed: output_tusd_borrowed,
+    st_policy_id: output_st_policy_id,
+    st_asset_name: output_st_asset_name,
+    st_borrowed: output_st_borrowed,
     loan_nft_pid: output_loan_nft_pid,
     loan_nft_asset_name: output_loan_nft_asset_name,
-    collateral_rate_in_lovelace: output_collateral_rate_in_lovelace,
+    collateral_rate_at_lending_precised: output_collateral_rate_at_lending_precised,
     collateral_asset: output_collateral_asset,
-    collateral_amount_in_lovelace: output_collateral_amount_in_lovelace,
+    collateral_asset_amount: output_collateral_asset_amount,
   } = collateral_output_datum
 
   // make sure there is loan NFT provided by the owner of the user account (Main validation requirement to allow for updating loan positions)
@@ -385,19 +382,18 @@ fn handle_increase_collateral(
       user_balance_output.value,
     )
   let expected_new_collateral_balance =
-    collateral_amount_in_lovelace + collateral_increase_amount
+    collateral_asset_amount + collateral_increase_amount
 
   and {
-    tusd_pool_hash == output_tusd_pool_hash,
-    tusd_policy_id == output_tusd_policy_id,
-    tusd_asset_name == output_tusd_asset_name,
-    tusd_borrowed == output_tusd_borrowed,
+    st_policy_id == output_st_policy_id,
+    st_asset_name == output_st_asset_name,
+    st_borrowed == output_st_borrowed,
     loan_nft_pid == output_loan_nft_pid,
     loan_nft_asset_name == output_loan_nft_asset_name,
-    collateral_rate_in_lovelace == output_collateral_rate_in_lovelace,
+    collateral_rate_at_lending_precised == output_collateral_rate_at_lending_precised,
     collateral_asset == output_collateral_asset,
     // make sure the collateral is increased with the right amount
-    output_collateral_amount_in_lovelace == expected_new_collateral_balance,
+    output_collateral_asset_amount == expected_new_collateral_balance,
     // make sure collateral value is not tampered with
     and {
       assets.without_lovelace(own_input.output.value) == assets.without_lovelace(
@@ -419,20 +415,19 @@ fn handle_partial_repayment(
     own_input.output.address.payment_credential
 
   expect Some(CollateralDatum {
-    tusd_pool_hash,
-    tusd_policy_id,
-    tusd_asset_name,
-    tusd_borrowed,
+    st_policy_id,
+    st_asset_name,
+    st_borrowed,
     loan_nft_pid,
     loan_nft_asset_name,
-    collateral_rate_in_lovelace,
+    collateral_rate_at_lending_precised,
     collateral_asset,
-    collateral_amount_in_lovelace,
+    collateral_asset_amount,
   }) = datum
 
   // Check for loan amount burning and burned amount
   expect [Pair(loan_token_name, loan_token_burn_quantity)] =
-    mint |> assets.tokens(tusd_policy_id) |> dict.to_pairs
+    mint |> assets.tokens(st_policy_id) |> dict.to_pairs
   expect loan_token_burn_quantity < 0
 
   expect Some(collateral_output) =
@@ -456,15 +451,14 @@ fn handle_partial_repayment(
     )
   expect InlineDatum(collateral_output_datum) = collateral_output.datum
   expect CollateralDatum {
-    tusd_pool_hash: output_tusd_pool_hash,
-    tusd_policy_id: output_tusd_policy_id,
-    tusd_asset_name: output_tusd_asset_name,
-    tusd_borrowed: output_tusd_borrowed,
+    st_policy_id: output_st_policy_id,
+    st_asset_name: output_st_asset_name,
+    st_borrowed: output_st_borrowed,
     loan_nft_pid: output_loan_nft_pid,
     loan_nft_asset_name: output_loan_nft_asset_name,
-    collateral_rate_in_lovelace: output_collateral_rate_in_lovelace,
+    collateral_rate_at_lending_precised: output_collateral_rate_at_lending_precised,
     collateral_asset: output_collateral_asset,
-    collateral_amount_in_lovelace: output_collateral_amount_in_lovelace,
+    collateral_asset_amount: output_collateral_asset_amount,
   } = collateral_output_datum
 
   // make sure there is loan NFT provided by the owner of the user account (Main validation requirement to allow for updating loan positions)
@@ -491,21 +485,20 @@ fn handle_partial_repayment(
         )
 
   // calculate the amount of remaining unpaid loan
-  let remaining_unpaid_loan = tusd_borrowed - -1 * loan_token_burn_quantity
+  let remaining_unpaid_loan = st_borrowed - -1 * loan_token_burn_quantity
 
   and {
-    tusd_pool_hash == output_tusd_pool_hash,
-    tusd_policy_id == output_tusd_policy_id,
-    tusd_asset_name == output_tusd_asset_name,
+    st_policy_id == output_st_policy_id,
+    st_asset_name == output_st_asset_name,
     // output loan borrowed in datum should be updated
-    output_tusd_borrowed == remaining_unpaid_loan,
+    output_st_borrowed == remaining_unpaid_loan,
     loan_nft_pid == output_loan_nft_pid,
     loan_nft_asset_name == output_loan_nft_asset_name,
-    collateral_rate_in_lovelace == output_collateral_rate_in_lovelace,
+    collateral_rate_at_lending_precised == output_collateral_rate_at_lending_precised,
     collateral_asset == output_collateral_asset,
-    collateral_amount_in_lovelace == output_collateral_amount_in_lovelace,
+    collateral_asset_amount == output_collateral_asset_amount,
     // loan token is really the loan token
-    tusd_asset_name == loan_token_name,
+    st_asset_name == loan_token_name,
     // make sure collateral value is not tampered with
     own_input.output.value == collateral_output.value,
   }
@@ -588,26 +581,28 @@ fn handle_withdraw_and_increase_deposit(
 
 // Tests
 fn get_collateral_details() {
-  let loan_nft_policy_id = mock_policy_id(0)
+  let loan_nfst_policy_id = mock_policy_id(0)
 
   let collateral_validator_script_hash = mock_script_hash(2)
-  let tusd_pool_script_hash = mock_script_hash(3)
   let test_usd_policy_id = mock_policy_id(0)
   let test_usd_asset_name = "tUSD"
-  let collateral_amount_in_lovelace = 15000000
+  let collateral_asset_amount = 15000000
   let loan_nft_name = "BorrowNFT1"
   let collateral_datum =
     CollateralDatum {
-      tusd_pool_hash: tusd_pool_script_hash,
-      tusd_policy_id: test_usd_policy_id,
-      tusd_asset_name: test_usd_asset_name,
-      tusd_borrowed: 12,
-      loan_nft_pid: loan_nft_policy_id,
+      st_policy_id: test_usd_policy_id,
+      st_asset_name: test_usd_asset_name,
+      st_borrowed: 12,
+      loan_nft_pid: loan_nfst_policy_id,
       loan_nft_asset_name: loan_nft_name,
       // $1.2 (per ADA)
-      collateral_rate_in_lovelace: 1200000,
-      collateral_asset: "ada",
-      collateral_amount_in_lovelace,
+      collateral_rate_at_lending_precised: 1200000,
+      collateral_asset: AssetType {
+        is_stable: False,
+        policy_id: "",
+        asset_name: "lovelace"
+      },
+      collateral_asset_amount,
     }
   let collateral_input =
     Input {
@@ -617,7 +612,7 @@ fn get_collateral_details() {
           payment_credential: Script(collateral_validator_script_hash),
           stake_credential: None,
         },
-        value: from_lovelace(collateral_amount_in_lovelace),
+        value: from_lovelace(collateral_asset_amount),
         datum: InlineDatum(collateral_datum),
         reference_script: None,
       },
@@ -627,7 +622,7 @@ fn get_collateral_details() {
 }
 
 test test_refund_loan() {
-  let loan_nft_policy_id = mock_policy_id(0)
+  let loan_nfst_policy_id = mock_policy_id(0)
   let protocol_parameters_script_hash = mock_script_hash(1)
   let oracle_script_hash = mock_script_hash(4)
   let liquidated_funds_collector_script_hash = mock_script_hash(5)
@@ -637,7 +632,7 @@ test test_refund_loan() {
   let (collateral_datum, collateral_input) = get_collateral_details()
 
   let mint =
-    from_asset_list([Pair(loan_nft_policy_id, [Pair(loan_nft_name, -1)])])
+    from_asset_list([Pair(loan_nfst_policy_id, [Pair(loan_nft_name, -1)])])
 
   let tx = Transaction { ..placeholder, inputs: [collateral_input], mint: mint }
 
@@ -657,7 +652,7 @@ test test_liquidate_loan_with_liquidation_threshold_reached() {
   let oracle_script_hash = mock_script_hash(4)
   let liquidated_funds_collector_script_hash = mock_script_hash(5)
   let collateral_input_utxo_ref = mock_utxo_ref(0, 1)
-  let collateral_amount_in_lovelace = 15000000
+  let collateral_asset_amount = 15000000
 
   let (collateral_datum, collateral_input) = get_collateral_details()
 
@@ -676,7 +671,23 @@ test test_liquidate_loan_with_liquidation_threshold_reached() {
             min_liquidation_threshold: 120,
             min_loan_amount: 10,
             protocol_usage_fee: 2,
-            collateral_assets: ["ada", "iUSD", "halalend", "hosky"],
+            collateral_assets: [
+              AssetType {
+                is_stable: False,
+                policy_id: "",
+                asset_name: "lovelace"
+              },
+              AssetType {
+                is_stable: True,
+                policy_id: mock_policy_id(0),
+                asset_name: "iUSD",
+              },
+              AssetType {
+                is_stable: False,
+                policy_id: mock_policy_id(1),
+                asset_name: "hosky"
+              },
+            ],
           },
         ),
         reference_script: None,
@@ -710,7 +721,7 @@ test test_liquidate_loan_with_liquidation_threshold_reached() {
         payment_credential: Script(liquidated_funds_collector_script_hash),
         stake_credential: None,
       },
-      value: from_lovelace(collateral_amount_in_lovelace),
+      value: from_lovelace(collateral_asset_amount),
       datum: NoDatum,
       reference_script: None,
     }
@@ -1004,13 +1015,12 @@ test test_increase_collateral() {
 
   let (collateral_datum, collateral_input) = get_collateral_details()
   expect CollateralDatum {
-    tusd_pool_hash,
-    tusd_policy_id,
-    tusd_asset_name,
-    tusd_borrowed,
+    st_policy_id,
+    st_asset_name,
+    st_borrowed,
     loan_nft_pid,
     loan_nft_asset_name,
-    collateral_rate_in_lovelace,
+    collateral_rate_at_lending_precised,
     collateral_asset,
     ..
   } = collateral_datum
@@ -1076,24 +1086,23 @@ test test_increase_collateral() {
       reference_script: None,
     }
 
-  let previous_collateral_amount_in_lovelace = 15000000
-  let updated_collateral_amount_in_lovelace =
-    previous_collateral_amount_in_lovelace + (
+  let previous_collateral_asset_amount = 15000000
+  let updated_collateral_asset_amount =
+    previous_collateral_asset_amount + (
       lovelace_of(user_balance_input.output.value) - lovelace_of(
         user_balance_output.value,
       )
     )
   let output_collateral_datum =
     CollateralDatum {
-      tusd_pool_hash,
-      tusd_policy_id,
-      tusd_asset_name,
-      tusd_borrowed,
+      st_policy_id,
+      st_asset_name,
+      st_borrowed,
       loan_nft_pid,
       loan_nft_asset_name,
-      collateral_rate_in_lovelace,
+      collateral_rate_at_lending_precised,
       collateral_asset,
-      collateral_amount_in_lovelace: updated_collateral_amount_in_lovelace,
+      collateral_asset_amount: updated_collateral_asset_amount,
     }
   let collateral_output =
     Output {
@@ -1101,7 +1110,7 @@ test test_increase_collateral() {
         payment_credential: Script(collateral_validator_script_hash),
         stake_credential: None,
       },
-      value: from_lovelace(updated_collateral_amount_in_lovelace),
+      value: from_lovelace(updated_collateral_asset_amount),
       datum: InlineDatum(output_collateral_datum),
       reference_script: None,
     }
@@ -1143,15 +1152,14 @@ test test_partial_repayment() {
 
   let (collateral_datum, collateral_input) = get_collateral_details()
   expect CollateralDatum {
-    tusd_pool_hash,
-    tusd_policy_id,
-    tusd_asset_name,
-    tusd_borrowed: previous_loan_amount,
+    st_policy_id,
+    st_asset_name,
+    st_borrowed: previous_loan_amount,
     loan_nft_pid,
     loan_nft_asset_name,
-    collateral_rate_in_lovelace,
+    collateral_rate_at_lending_precised,
     collateral_asset,
-    collateral_amount_in_lovelace,
+    collateral_asset_amount,
   } = collateral_datum
 
   let user_wallet_input =
@@ -1186,15 +1194,14 @@ test test_partial_repayment() {
 
   let output_collateral_datum =
     CollateralDatum {
-      tusd_pool_hash,
-      tusd_policy_id,
-      tusd_asset_name,
-      tusd_borrowed: previous_loan_amount - loan_token_burn_amount,
+      st_policy_id,
+      st_asset_name,
+      st_borrowed: previous_loan_amount - loan_token_burn_amount,
       loan_nft_pid,
       loan_nft_asset_name,
-      collateral_rate_in_lovelace,
+      collateral_rate_at_lending_precised,
       collateral_asset,
-      collateral_amount_in_lovelace,
+      collateral_asset_amount,
     }
   let collateral_output =
     Output {
@@ -1208,7 +1215,7 @@ test test_partial_repayment() {
     }
 
   let mint =
-    from_asset(tusd_policy_id, tusd_asset_name, -1 * loan_token_burn_amount)
+    from_asset(st_policy_id, st_asset_name, -1 * loan_token_burn_amount)
 
   let tx =
     Transaction {

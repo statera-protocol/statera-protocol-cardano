@@ -4,9 +4,11 @@ use aiken/crypto.{ScriptHash}
 use cardano/address.{Address, Script}
 use cardano/assets.{PolicyId, Value, from_asset, from_lovelace}
 use cardano/transaction.{InlineDatum, Input, Output, Transaction, placeholder}
-use halalend/datums.{CollateralDatum, CollateralValidatorDatum}
 use mocktail/virgin_key_hash.{mock_policy_id, mock_script_hash}
 use mocktail/virgin_output_reference.{mock_utxo_ref}
+use statera/constants.{st_stable_asset_name, precision_factor}
+use statera/datums.{CollateralDatum, CollateralValidatorDatum}
+use statera/types.{AssetType}
 
 pub type MintLoanRedeemer {
   GetLoan
@@ -24,7 +26,14 @@ validator mint_loan_validator(collateral_validator_hash: ScriptHash) {
       GetLoan ->
         validate_get_loan(collateral_validator_hash, outputs, mint, policy_id)
       RepayLoan | PartialRepay ->
-        validate_repay_and_partial_repay_loan(collateral_validator_hash, inputs, outputs, mint, policy_id, redeemer)
+        validate_repay_and_partial_repay_loan(
+          collateral_validator_hash,
+          inputs,
+          outputs,
+          mint,
+          policy_id,
+          redeemer,
+        )
       GetStables -> True
     }
   }
@@ -50,7 +59,8 @@ fn validate_get_loan(
           ))?,
           when output.datum is {
             InlineDatum(output_datum) ->
-              if output_datum is CollateralDatum { .. }: CollateralValidatorDatum {
+              if output_datum
+              is CollateralDatum { .. }: CollateralValidatorDatum {
                 True
               } else {
                 False
@@ -63,26 +73,18 @@ fn validate_get_loan(
 
   expect InlineDatum(collateral_output_datum) = collateral_output.datum
 
-  expect CollateralDatum {
-    tusd_pool_hash,
-    tusd_policy_id,
-    tusd_asset_name,
-    tusd_borrowed,
-    ..
-  } = collateral_output_datum
+  expect CollateralDatum { st_policy_id, st_asset_name, st_borrowed, .. } =
+    collateral_output_datum
 
   expect [Pair(name, quantity)] =
     mint |> assets.tokens(policy_id) |> dict.to_pairs
 
-  let is_loan_pool_and_pid_valid = and {
-      policy_id == tusd_pool_hash,
-      policy_id == tusd_policy_id,
-    }
+  let is_loan_pool_and_pid_valid = policy_id == st_policy_id
   let is_loan_asset_name_valid = and {
-      name == tusd_asset_name,
-      name == "tUSD",
+      name == st_asset_name,
+      name == st_stable_asset_name,
     }
-  let is_loan_mint_quantity_valid = quantity == tusd_borrowed
+  let is_loan_mint_quantity_valid = quantity == st_borrowed
 
   and {
     is_loan_pool_and_pid_valid?,
@@ -109,7 +111,8 @@ fn validate_repay_and_partial_repay_loan(
           ))?,
           when input.output.datum is {
             InlineDatum(input_datum) ->
-              if input_datum is CollateralDatum { .. }: CollateralValidatorDatum {
+              if input_datum
+              is CollateralDatum { .. }: CollateralValidatorDatum {
                 True
               } else {
                 False
@@ -120,39 +123,39 @@ fn validate_repay_and_partial_repay_loan(
       },
     )
   expect InlineDatum(collateral_input_datum) = collateral_input.output.datum
-  expect CollateralDatum { tusd_borrowed, .. } = collateral_input_datum
+  expect CollateralDatum { st_borrowed, .. } = collateral_input_datum
 
   expect [Pair(_, quantity)] = mint |> assets.tokens(policy_id) |> dict.to_pairs
 
   when redeemer is {
-    RepayLoan -> (quantity == -tusd_borrowed)?
+    RepayLoan -> (quantity == -st_borrowed)?
     PartialRepay -> {
-        expect Some(collateral_output) =
-          list.find(
-            outputs,
-            fn(output) {
-              and {
-                output.address.payment_credential == Script(collateral_validator_hash),
-                when output.datum is {
-                  InlineDatum(output_datum) ->
-                    if output_datum
-                    is CollateralDatum { .. }: CollateralValidatorDatum {
-                      True
-                    } else {
-                      False
-                    }
-                  _ -> False
-                },
-              }
-            },
-          )
-        expect InlineDatum(collateral_output_datum) = collateral_output.datum
-        expect CollateralDatum {
-          tusd_borrowed: output_tusd_borrowed,
-          ..
-        } = collateral_output_datum
+      expect Some(collateral_output) =
+        list.find(
+          outputs,
+          fn(output) {
+            and {
+              output.address.payment_credential == Script(
+                collateral_validator_hash,
+              ),
+              when output.datum is {
+                InlineDatum(output_datum) ->
+                  if output_datum
+                  is CollateralDatum { .. }: CollateralValidatorDatum {
+                    True
+                  } else {
+                    False
+                  }
+                _ -> False
+              },
+            }
+          },
+        )
+      expect InlineDatum(collateral_output_datum) = collateral_output.datum
+      expect CollateralDatum { st_borrowed: output_st_borrowed, .. } =
+        collateral_output_datum
 
-      (output_tusd_borrowed == (tusd_borrowed - (-1 * quantity)))?
+      (output_st_borrowed == st_borrowed - -1 * quantity)?
     }
     _ -> False
   }
@@ -162,11 +165,8 @@ fn validate_repay_and_partial_repay_loan(
 test test_mint_loan_tokens() {
   let loan_nft_policy_id = mock_policy_id(1)
   let collateral_validator_script_hash = mock_script_hash(2)
-  let test_usd_pool_hash = mock_script_hash(3)
-  let test_usd_policy_id = mock_script_hash(3)
-  // mock_policy_id(x)
-  let test_usd_asset_name = "tUSD"
-  let collateral_amount_in_lovelace = 15000000
+  let test_st_policy_id = mock_script_hash(3)
+  let collateral_asset_amount = 21600000
   let loan_nft_name = "BorrowNFT1"
   let collateral_validator_output =
     Output {
@@ -174,25 +174,27 @@ test test_mint_loan_tokens() {
         payment_credential: Script(collateral_validator_script_hash),
         stake_credential: None,
       },
-      value: from_lovelace(collateral_amount_in_lovelace),
+      value: from_lovelace(collateral_asset_amount),
       datum: InlineDatum(
         CollateralDatum {
-          tusd_pool_hash: test_usd_pool_hash,
-          tusd_policy_id: test_usd_policy_id,
-          tusd_asset_name: test_usd_asset_name,
-          tusd_borrowed: 12,
+          st_policy_id: test_st_policy_id,
+          st_asset_name: st_stable_asset_name,
+          st_borrowed: 12_000_000,
           loan_nft_pid: loan_nft_policy_id,
           loan_nft_asset_name: loan_nft_name,
-          // $1.2 (per ADA)
-          collateral_rate_in_lovelace: 1200000,
-          collateral_asset: "ada",
-          collateral_amount_in_lovelace,
+          collateral_rate_at_lending_precised: 12 * precision_factor / 10,
+          collateral_asset: AssetType {
+            is_stable: False,
+            policy_id: "",
+            asset_name: "lovelace",
+          },
+          collateral_asset_amount,
         },
       ),
       reference_script: None,
     }
 
-  let mint = from_asset(test_usd_policy_id, "tUSD", 12)
+  let mint = from_asset(test_st_policy_id, st_stable_asset_name, 12_000_000)
 
   let tx =
     Transaction {
@@ -204,7 +206,7 @@ test test_mint_loan_tokens() {
   mint_loan_validator.mint(
     collateral_validator_script_hash,
     GetLoan,
-    test_usd_policy_id,
+    test_st_policy_id,
     tx,
   )
 }
@@ -212,11 +214,8 @@ test test_mint_loan_tokens() {
 test test_burn_loan_tokens() {
   let loan_nft_policy_id = mock_policy_id(1)
   let collateral_validator_script_hash = mock_script_hash(2)
-  let test_usd_pool_hash = mock_script_hash(3)
-  let test_usd_policy_id = mock_script_hash(3)
-  // mock_policy_id(x)
-  let test_usd_asset_name = "tUSD"
-  let collateral_amount_in_lovelace = 15000000
+  let test_st_policy_id = mock_script_hash(3)
+  let collateral_asset_amount = 15000000
   let loan_nft_name = "BorrowNFT1"
   let collateral_validator_input =
     Input {
@@ -226,26 +225,29 @@ test test_burn_loan_tokens() {
           payment_credential: Script(collateral_validator_script_hash),
           stake_credential: None,
         },
-        value: from_lovelace(collateral_amount_in_lovelace),
+        value: from_lovelace(collateral_asset_amount),
         datum: InlineDatum(
           CollateralDatum {
-            tusd_pool_hash: test_usd_pool_hash,
-            tusd_policy_id: test_usd_policy_id,
-            tusd_asset_name: test_usd_asset_name,
-            tusd_borrowed: 12,
+            st_policy_id: test_st_policy_id,
+            st_asset_name: st_stable_asset_name,
+            st_borrowed: 12_000_000,
             loan_nft_pid: loan_nft_policy_id,
             loan_nft_asset_name: loan_nft_name,
             // $1.2 (per ADA)
-            collateral_rate_in_lovelace: 1200000,
-            collateral_asset: "ada",
-            collateral_amount_in_lovelace,
+            collateral_rate_at_lending_precised: 12 * precision_factor / 10,
+            collateral_asset: AssetType {
+              is_stable: False,
+              policy_id: "",
+              asset_name: "lovelace",
+            },
+            collateral_asset_amount,
           },
         ),
         reference_script: None,
       },
     }
 
-  let mint = from_asset(test_usd_policy_id, "tUSD", -12)
+  let mint = from_asset(test_st_policy_id, st_stable_asset_name, -12_000_000)
 
   let tx =
     Transaction {
@@ -257,21 +259,17 @@ test test_burn_loan_tokens() {
   mint_loan_validator.mint(
     collateral_validator_script_hash,
     RepayLoan,
-    test_usd_policy_id,
+    test_st_policy_id,
     tx,
   )
 }
 
 test test_partial_repay_burn() {
-  let loan_token_burn_amount = 6
-
+  let loan_token_burn_amount = 6_000_000
   let loan_nft_policy_id = mock_policy_id(1)
   let collateral_validator_script_hash = mock_script_hash(2)
-  let test_usd_pool_hash = mock_script_hash(3)
-  let test_usd_policy_id = mock_script_hash(3)
-  // mock_policy_id(x)
-  let test_usd_asset_name = "tUSD"
-  let collateral_amount_in_lovelace = 15000000
+  let test_st_policy_id = mock_script_hash(3)
+  let collateral_asset_amount = 15000000
   let loan_nft_name = "BorrowNFT1"
   let collateral_validator_input =
     Input {
@@ -281,19 +279,22 @@ test test_partial_repay_burn() {
           payment_credential: Script(collateral_validator_script_hash),
           stake_credential: None,
         },
-        value: from_lovelace(collateral_amount_in_lovelace),
+        value: from_lovelace(collateral_asset_amount),
         datum: InlineDatum(
           CollateralDatum {
-            tusd_pool_hash: test_usd_pool_hash,
-            tusd_policy_id: test_usd_policy_id,
-            tusd_asset_name: test_usd_asset_name,
-            tusd_borrowed: 12,
+            st_policy_id: test_st_policy_id,
+            st_asset_name: st_stable_asset_name,
+            st_borrowed: 12_000_000,
             loan_nft_pid: loan_nft_policy_id,
             loan_nft_asset_name: loan_nft_name,
             // $1.2 (per ADA)
-            collateral_rate_in_lovelace: 1200000,
-            collateral_asset: "ada",
-            collateral_amount_in_lovelace,
+            collateral_rate_at_lending_precised: 12 * precision_factor / 10,
+            collateral_asset: AssetType {
+              is_stable: False,
+              policy_id: "",
+              asset_name: "lovelace",
+            },
+            collateral_asset_amount,
           },
         ),
         reference_script: None,
@@ -302,16 +303,18 @@ test test_partial_repay_burn() {
 
   let output_collateral_datum =
     CollateralDatum {
-      tusd_pool_hash: test_usd_pool_hash,
-      tusd_policy_id: test_usd_policy_id,
-      tusd_asset_name: test_usd_asset_name,
-      tusd_borrowed: 12 - loan_token_burn_amount,
+      st_policy_id: test_st_policy_id,
+      st_asset_name: st_stable_asset_name,
+      st_borrowed: 12_000_000 - loan_token_burn_amount,
       loan_nft_pid: loan_nft_policy_id,
       loan_nft_asset_name: loan_nft_name,
-      // $1.2 (per ADA)
-      collateral_rate_in_lovelace: 1200000,
-      collateral_asset: "ada",
-      collateral_amount_in_lovelace,
+      collateral_rate_at_lending_precised: 12 * precision_factor / 10,
+      collateral_asset: AssetType {
+        is_stable: False,
+        policy_id: "",
+        asset_name: "lovelace",
+      },
+      collateral_asset_amount,
     }
   let collateral_output =
     Output {
@@ -319,12 +322,12 @@ test test_partial_repay_burn() {
         payment_credential: Script(collateral_validator_script_hash),
         stake_credential: None,
       },
-      value: from_lovelace(collateral_amount_in_lovelace),
+      value: from_lovelace(collateral_asset_amount),
       datum: InlineDatum(output_collateral_datum),
       reference_script: None,
     }
 
-  let mint = from_asset(test_usd_policy_id, "tUSD", -(loan_token_burn_amount))
+  let mint = from_asset(test_st_policy_id, st_stable_asset_name, -loan_token_burn_amount)
 
   let tx =
     Transaction {
@@ -337,7 +340,7 @@ test test_partial_repay_burn() {
   mint_loan_validator.mint(
     collateral_validator_script_hash,
     PartialRepay,
-    test_usd_policy_id,
+    test_st_policy_id,
     tx,
   )
 }
