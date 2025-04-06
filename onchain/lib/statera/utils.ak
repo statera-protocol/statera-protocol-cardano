@@ -1,9 +1,14 @@
 use aiken/collection/list
 use aiken/crypto.{ScriptHash, VerificationKeyHash}
 use aiken/interval.{Finite, PositiveInfinity}
+use aiken/primitive/bytearray
 use cardano/address.{Script, VerificationKey}
 use cardano/assets.{AssetName, PolicyId, quantity_of}
-use cardano/transaction.{Input, Output, OutputReference, ValidityRange}
+use cardano/transaction.{
+  InlineDatum, Input, Output, OutputReference, ValidityRange,
+}
+use statera/datums.{OracleDatum}
+use statera/types.{AssetRate}
 
 // validate that the transaction is signed by 'signer'
 pub fn signed_by(
@@ -132,4 +137,50 @@ pub fn get_borrower_loan_term(loan_term: Int, range: ValidityRange) {
       1_000_000_000_000_000_000_000_000_000_000_000_000
     }
   }
+}
+
+/// Finds a reference input of the unified control validator
+pub fn find_ucv_ref_input(
+  ref_inputs: List<Input>,
+  unified_control_validator_hash: ScriptHash,
+  the_asset_name: AssetName,
+) {
+  ref_inputs
+    |> list.find(
+        fn(ref_i) {
+          and {
+            (Script(unified_control_validator_hash) == ref_i.output.address.payment_credential)?,
+            (quantity_of(
+              ref_i.output.value,
+              unified_control_validator_hash,
+              the_asset_name,
+            ) == 1)?,
+          }
+        },
+      )
+}
+
+/// Finds an oracle rate from the oracle ref datum
+pub fn find_oracle_rate(
+  oracle_ref: Input,
+  collateral_asset_pid: PolicyId,
+  collateral_asset_an: AssetName,
+) {
+  expect InlineDatum(oracle_ref_datum) = oracle_ref.output.datum
+  // make sure the oracle reference input datum contains a list of asset rates
+  expect OracleDatum { oracle_rates } = oracle_ref_datum
+
+  list.find(
+    oracle_rates,
+    fn(a_oracle) {
+      let a_collateral_asset_unit =
+        bytearray.concat(collateral_asset_pid, collateral_asset_an)
+      let AssetRate { unit: a_unit, .. } = a_oracle
+
+      trace @"a_unit": a_unit
+      trace @"a_collateral_asset_unit": a_collateral_asset_unit
+
+      (a_unit == a_collateral_asset_unit)?
+    },
+  )
 }

@@ -25,7 +25,7 @@ use statera/datums.{
 }
 use statera/types.{AssetRate, AssetType}
 use statera/utils.{
-  calculate_by_percentage,
+  calculate_by_percentage, find_oracle_rate, find_ucv_ref_input,
   get_user_asset_amt_in_out,
 }
 
@@ -118,9 +118,9 @@ fn validate_mint_borrow_nft(
   } = collateral_output_datum
 
   let AssetType {
-    is_stable: is_asset_stable,
     policy_id: collateral_asset_pid,
     asset_name: collateral_asset_an,
+    ..
   } = collateral_asset
 
   let is_borrow_amount_valid =
@@ -187,7 +187,6 @@ fn validate_mint_borrow_nft(
   // trace @"loan_nft_pid_valid_in_datum": loan_nft_pid_valid_in_datum, True
   // trace @"loan_nft_mint": loan_nft_mint, True
   // trace @"st_asset_name_valid": st_asset_name_valid, True
-
   and {
     validate_protocol_parameters(
       reference_inputs,
@@ -198,7 +197,6 @@ fn validate_mint_borrow_nft(
       collateral_asset_pid,
       collateral_asset_an,
       collateral_asset,
-      is_asset_stable,
     )?,
     is_borrow_amount_valid?,
     is_borrow_input_change_returned?,
@@ -219,24 +217,15 @@ fn validate_protocol_parameters(
   collateral_asset_pid: PolicyId,
   collateral_asset_an: AssetName,
   collateral_asset: AssetType,
-  is_asset_stable: Bool,
 ) {
   trace @"in validate_protocol_parameters()"
 
   expect Some(protocol_parameters_ref) =
-    reference_inputs
-      |> list.find(
-          fn(ref_i) {
-            and {
-              (Script(unified_control_validator_hash) == ref_i.output.address.payment_credential)?,
-              (quantity_of(
-                ref_i.output.value,
-                unified_control_validator_hash,
-                st_pparams_asset_name,
-              ) == 1)?,
-            }
-          },
-        )
+    find_ucv_ref_input(
+      reference_inputs,
+      unified_control_validator_hash,
+      st_pparams_asset_name,
+    )
 
   expect InlineDatum(protocol_parameters_datum) =
     protocol_parameters_ref.output.datum
@@ -256,47 +245,37 @@ fn validate_protocol_parameters(
   // Validating MCR
   // If asset is a stable coin, no need to calculate with min_collateral ratio. Mint 1:1 with ST tokens
   let hundred_percent_col_asset_value =
-    if is_asset_stable {
-      collateral_asset_amount
-    } else {
-      calculate_by_percentage(
-        collateral_asset_amount * precision_factor,
-        min_collateral_ratio,
-        100,
-      )
-    }
+    calculate_by_percentage(
+      collateral_asset_amount * precision_factor,
+      min_collateral_ratio,
+      100,
+    )
 
   trace @"before is_col_amount_and_rate_valid"
 
-  let is_col_amount_and_rate_valid =
-    if is_asset_stable {
-      and {
-        (hundred_percent_col_asset_value == borrow_output_st)?,
-        (collateral_rate_at_lending_precised == 1)?,
-      }
-    } else {
-      trace @"inside is_col_amount_and_rate_valid else.."
-      let (expected_col_asset_amount, oracle_asset_st_rate) =
-        get_expected_col_asset_amount(
-          unified_control_validator_hash,
-          reference_inputs,
-          borrow_output_st,
-          collateral_asset_pid,
-          collateral_asset_an,
-        )
+  let is_col_amount_and_rate_valid = {
+    trace @"inside is_col_amount_and_rate_valid else.."
+    let (expected_col_asset_amount, oracle_asset_st_rate) =
+      get_expected_col_asset_amount(
+        unified_control_validator_hash,
+        reference_inputs,
+        borrow_output_st,
+        collateral_asset_pid,
+        collateral_asset_an,
+      )
 
-      trace @"immediately after calling get_expected_col_asset_amount"
+    trace @"immediately after calling get_expected_col_asset_amount"
 
-      trace @"hundred_percent_col_asset_value": hundred_percent_col_asset_value
-      trace @"expected_col_asset_amount": expected_col_asset_amount
+    trace @"hundred_percent_col_asset_value": hundred_percent_col_asset_value
+    trace @"expected_col_asset_amount": expected_col_asset_amount
 
-      and {
-        // Both operand below are in product of the precision_factor
-        (hundred_percent_col_asset_value >= expected_col_asset_amount)?,
-        // Oracle usd rate is same as the one in datum
-        (oracle_asset_st_rate == collateral_rate_at_lending_precised)?,
-      }
+    and {
+      // Both operand below are in product of the precision_factor
+      (hundred_percent_col_asset_value >= expected_col_asset_amount)?,
+      // Oracle usd rate is same as the one in datum
+      (oracle_asset_st_rate == collateral_rate_at_lending_precised)?,
     }
+  }
 
   trace @"after is_col_amount_and_rate_valid"
 
@@ -319,43 +298,16 @@ fn get_expected_col_asset_amount(
   collateral_asset_an: AssetName,
 ) {
   expect Some(oracle_ref) =
-    reference_inputs
-      |> list.find(
-          fn(ref_i) {
-            and {
-              (Script(unified_control_validator_hash) == ref_i.output.address.payment_credential)?,
-              (quantity_of(
-                ref_i.output.value,
-                unified_control_validator_hash,
-                st_oracle_asset_name,
-              ) == 1)?,
-            }
-          },
-        )
+    find_ucv_ref_input(
+      reference_inputs,
+      unified_control_validator_hash,
+      st_oracle_asset_name,
+    )
 
   trace @"in get_expected_col_asset_amount immediately after expecting oracle_ref"
 
-  expect InlineDatum(oracle_ref_d) = oracle_ref.output.datum
-  // make sure the oracle reference input datum contains a list of asset rates
-  expect oracle_ref_datum: OracleDatum = oracle_ref_d
-
   expect Some(oracle_rate) =
-    list.find(
-      oracle_ref_datum,
-      fn(a_oracle) {
-        let a_collateral_asset_unit =
-          bytearray.concat(
-            collateral_asset_pid,
-            collateral_asset_an,
-          )
-        let AssetRate { unit: a_unit, .. } = a_oracle
-
-        trace @"a_unit": a_unit
-        trace @"a_collateral_asset_unit": a_collateral_asset_unit
-
-        (a_unit == a_collateral_asset_unit)?
-      },
-    )
+    find_oracle_rate(oracle_ref, collateral_asset_pid, collateral_asset_an)
 
   trace @"in get_expected_col_asset_amount immediately after expecting oracle_rate"
 
@@ -383,6 +335,7 @@ fn validate_ada_collateral(
   outputs: List<Output>,
 ) {
   // find user ada deposit utxo, get it's datum and the depositor's verification key hash
+  // For ADA collateral, utxo must be from the user's protocol balance
   expect
     borrow_input.output.address.payment_credential == Script(
       collateral_validator_hash,
@@ -453,6 +406,7 @@ fn validate_other_assets_collateral(
   collateral_asset_pid: PolicyId,
   collateral_asset_an: AssetName,
 ) {
+  // For non-ADA collaterals utxo must be from user's wallet
   expect VerificationKey(user_vkh) =
     borrow_input.output.address.payment_credential
 
@@ -486,7 +440,6 @@ fn validate_other_assets_collateral(
     quantity_of(borrow_output.value, st_policy_id, st_asset_name)
 
   // trace @"is_borrow_input_change_returned": is_borrow_input_change_returned, True, "mmm"
-
   (is_borrow_input_change_returned, borrow_output_st)
 }
 
@@ -781,11 +734,7 @@ fn get_protocol_parameters_ref() {
   protocol_parameters_ref
 }
 
-fn get_oracle_ref(
-  unit: ByteArray,
-  num: Int,
-  denum: Int,
-) {
+fn get_oracle_ref(unit: ByteArray, num: Int, denum: Int) {
   let unified_control_validator_hash = mock_script_hash(1)
 
   let oracle_outref = mock_utxo_ref(0, 2)
@@ -802,19 +751,13 @@ fn get_oracle_ref(
           from_asset(unified_control_validator_hash, st_oracle_asset_name, 1),
         ),
         datum: InlineDatum(
-          [
-            AssetRate {
-              unit,
-              num,
-              denum,
-            },
-          ],
+          OracleDatum { oracle_rates: [AssetRate { unit, num, denum }] },
         ),
         reference_script: None,
       },
     }
 
-    oracle_ref
+  oracle_ref
 }
 
 test test_borrow_with_ada_collateral() {
@@ -929,7 +872,8 @@ test test_borrow_with_hosky_collateral() {
   let unified_control_validator_hash = mock_script_hash(1)
   let collateral_validator_script_hash = mock_script_hash(2)
   let borrow_hosky_amount_100_percent = 11600000000
-  let borrow_hosky_amount = (11600000000 * 150) / 100 // overcollateralized collateral
+  let borrow_hosky_amount = 11600000000 * 150 / 100
+  // overcollateralized collateral
   let borrow_outref = mock_utxo_ref(0, 0)
   let borrow_key_hash = mock_pub_key_hash(0)
   let borrower_hosky_balance = 40000000000
@@ -938,8 +882,10 @@ test test_borrow_with_hosky_collateral() {
   let hosky_unit = bytearray.concat(hosky_pid, hosky_an)
   let hosky_rate_num = 20_000_000
   let hosky_rate_denum = 1_000_000
-  let st_can_be_borrowed = borrow_hosky_amount_100_percent / (hosky_rate_num / hosky_rate_denum) // 20 hosky per staterites
+  let st_can_be_borrowed =
+    borrow_hosky_amount_100_percent / ( hosky_rate_num / hosky_rate_denum )
 
+  // 20 hosky per staterites
   let borrow_input =
     Input {
       output_reference: borrow_outref,
@@ -978,7 +924,7 @@ test test_borrow_with_hosky_collateral() {
           st_borrowed: st_can_be_borrowed,
           loan_nft_pid: loan_nft_policy_id,
           loan_nft_asset_name: loan_nft_name,
-          collateral_rate_at_lending_precised: (hosky_rate_num * precision_factor) / hosky_rate_denum,
+          collateral_rate_at_lending_precised: hosky_rate_num * precision_factor / hosky_rate_denum,
           collateral_asset: AssetType {
             is_stable: False,
             policy_id: hosky_pid,
@@ -1000,9 +946,17 @@ test test_borrow_with_hosky_collateral() {
         assets.merge(
           assets.merge(
             from_lovelace(2000000),
-            from_asset(hosky_pid, hosky_an, borrower_hosky_balance - borrow_hosky_amount),
+            from_asset(
+              hosky_pid,
+              hosky_an,
+              borrower_hosky_balance - borrow_hosky_amount,
+            ),
           ),
-          from_asset(test_st_policy_id, st_stable_asset_name, st_can_be_borrowed),
+          from_asset(
+            test_st_policy_id,
+            st_stable_asset_name,
+            st_can_be_borrowed,
+          ),
         ),
         from_asset(loan_nft_policy_id, loan_nft_name, 1),
       ),
@@ -1014,7 +968,10 @@ test test_borrow_with_hosky_collateral() {
     from_asset_list(
       [
         Pair(loan_nft_policy_id, [Pair(loan_nft_name, 1)]),
-        Pair(test_st_policy_id, [Pair(st_stable_asset_name, st_can_be_borrowed)]),
+        Pair(
+          test_st_policy_id,
+          [Pair(st_stable_asset_name, st_can_be_borrowed)],
+        ),
       ],
     )
 
@@ -1027,116 +984,6 @@ test test_borrow_with_hosky_collateral() {
       inputs: [borrow_input],
       outputs: [collateral_validator_output, borrow_output],
       reference_inputs: [protocol_parameters_ref, oracle_ref],
-      mint: mint,
-    }
-
-  loan_nft_validator.mint(
-    borrow_outref,
-    collateral_validator_script_hash,
-    unified_control_validator_hash,
-    BorrowLoan,
-    loan_nft_policy_id,
-    tx,
-  )
-}
-
-test test_borrow_with_iusd_collateral() {
-  let unified_control_validator_hash = mock_script_hash(1)
-  let collateral_validator_script_hash = mock_script_hash(2)
-  let borrow_iusd_amount = 125_000_000
-  let borrow_outref = mock_utxo_ref(0, 0)
-  let borrow_key_hash = mock_pub_key_hash(0)
-  let borrower_iusd_balance = 400_000_000
-  let iusd_pid = mock_policy_id(8)
-  let iusd_an = "iUSD"
-  let st_can_be_borrowed = borrow_iusd_amount // 1 iusd == 1 susd (stable coin)
-
-  let borrow_input =
-    Input {
-      output_reference: borrow_outref,
-      output: Output {
-        address: Address {
-          payment_credential: VerificationKey(borrow_key_hash),
-          stake_credential: None,
-        },
-        value: assets.merge(
-          from_lovelace(2000000),
-          from_asset(iusd_pid, iusd_an, borrower_iusd_balance),
-        ),
-        datum: NoDatum,
-        reference_script: None,
-      },
-    }
-
-  let loan_nft_policy_id = mock_policy_id(1)
-  let test_st_policy_id = mock_policy_id(9)
-  let collateral_asset_amount = borrow_iusd_amount
-  let loan_nft_name = "BorrowNFT1"
-  let collateral_validator_output =
-    Output {
-      address: Address {
-        payment_credential: Script(collateral_validator_script_hash),
-        stake_credential: None,
-      },
-      value: assets.merge(
-        from_lovelace(2000000),
-        from_asset(iusd_pid, iusd_an, collateral_asset_amount),
-      ),
-      datum: InlineDatum(
-        CollateralDatum {
-          st_policy_id: test_st_policy_id,
-          st_asset_name: st_stable_asset_name,
-          st_borrowed: st_can_be_borrowed,
-          loan_nft_pid: loan_nft_policy_id,
-          loan_nft_asset_name: loan_nft_name,
-          collateral_rate_at_lending_precised: 1,
-          collateral_asset: AssetType {
-            is_stable: True,
-            policy_id: iusd_pid,
-            asset_name: iusd_an,
-          },
-          collateral_asset_amount,
-        },
-      ),
-      reference_script: None,
-    }
-
-  let borrow_output =
-    Output {
-      address: Address {
-        payment_credential: VerificationKey(borrow_key_hash),
-        stake_credential: None,
-      },
-      value: assets.merge(
-        assets.merge(
-          assets.merge(
-            from_lovelace(2000000),
-            from_asset(iusd_pid, iusd_an, borrower_iusd_balance - borrow_iusd_amount),
-          ),
-          from_asset(test_st_policy_id, st_stable_asset_name, st_can_be_borrowed),
-        ),
-        from_asset(loan_nft_policy_id, loan_nft_name, 1),
-      ),
-      datum: NoDatum,
-      reference_script: None,
-    }
-
-  let mint =
-    from_asset_list(
-      [
-        Pair(loan_nft_policy_id, [Pair(loan_nft_name, 1)]),
-        Pair(test_st_policy_id, [Pair(st_stable_asset_name, st_can_be_borrowed)]),
-      ],
-    )
-
-  let protocol_parameters_ref = get_protocol_parameters_ref()
-
-  let tx =
-    Transaction {
-      ..placeholder,
-      inputs: [borrow_input],
-      outputs: [collateral_validator_output, borrow_output],
-      reference_inputs: [protocol_parameters_ref],
       mint: mint,
     }
 
@@ -1272,7 +1119,8 @@ test test_refund_to_redeem_hosky_collateral() {
   let unified_control_validator_hash = mock_script_hash(1)
   let collateral_validator_script_hash = mock_script_hash(2)
   let borrow_hosky_amount_100_percent = 11600000000
-  let borrow_hosky_amount = (11600000000 * 150) / 100 // overcollateralized collateral
+  let borrow_hosky_amount = 11600000000 * 150 / 100
+  // overcollateralized collateral
   let borrow_outref = mock_utxo_ref(0, 0)
   let borrow_key_hash = mock_pub_key_hash(0)
   let borrower_hosky_balance = 40000000000
@@ -1280,7 +1128,9 @@ test test_refund_to_redeem_hosky_collateral() {
   let hosky_an = "hosky"
   let hosky_rate_num = 20_000_000
   let hosky_rate_denum = 1_000_000
-  let st_can_be_borrowed = borrow_hosky_amount_100_percent / (hosky_rate_num / hosky_rate_denum) // 20 hosky per staterites
+  let st_can_be_borrowed =
+    borrow_hosky_amount_100_percent / ( hosky_rate_num / hosky_rate_denum )
+  // 20 hosky per staterites
   let test_st_policy_id = mock_policy_id(9)
   let loan_nft_policy_id = mock_policy_id(1)
   let loan_nft_name = "BorrowNFT1"
@@ -1297,9 +1147,17 @@ test test_refund_to_redeem_hosky_collateral() {
           assets.merge(
             assets.merge(
               from_lovelace(2000000),
-              from_asset(hosky_pid, hosky_an, borrower_hosky_balance - borrow_hosky_amount),
+              from_asset(
+                hosky_pid,
+                hosky_an,
+                borrower_hosky_balance - borrow_hosky_amount,
+              ),
             ),
-            from_asset(test_st_policy_id, st_stable_asset_name, st_can_be_borrowed),
+            from_asset(
+              test_st_policy_id,
+              st_stable_asset_name,
+              st_can_be_borrowed,
+            ),
           ),
           from_asset(loan_nft_policy_id, loan_nft_name, 1),
         ),
@@ -1328,7 +1186,7 @@ test test_refund_to_redeem_hosky_collateral() {
             st_borrowed: st_can_be_borrowed,
             loan_nft_pid: loan_nft_policy_id,
             loan_nft_asset_name: loan_nft_name,
-            collateral_rate_at_lending_precised: (hosky_rate_num * precision_factor) / hosky_rate_denum,
+            collateral_rate_at_lending_precised: hosky_rate_num * precision_factor / hosky_rate_denum,
             collateral_asset: AssetType {
               is_stable: False,
               policy_id: hosky_pid,
@@ -1338,7 +1196,7 @@ test test_refund_to_redeem_hosky_collateral() {
           },
         ),
         reference_script: None,
-      }
+      },
     }
 
   let refunder_output =
@@ -1359,117 +1217,10 @@ test test_refund_to_redeem_hosky_collateral() {
     from_asset_list(
       [
         Pair(loan_nft_policy_id, [Pair(loan_nft_name, -1)]),
-        Pair(test_st_policy_id, [Pair(st_stable_asset_name, -st_can_be_borrowed)]),
-      ],
-    )
-
-  let tx =
-    Transaction {
-      ..placeholder,
-      inputs: [refunder_input, collateral_validator_input],
-      outputs: [refunder_output],
-      mint: mint,
-    }
-
-  loan_nft_validator.mint(
-    borrow_outref,
-    collateral_validator_script_hash,
-    unified_control_validator_hash,
-    RepayLoan,
-    loan_nft_policy_id,
-    tx,
-  )
-}
-
-test test_refund_to_redeem_iusd_collateral() {
-  let unified_control_validator_hash = mock_script_hash(1)
-  let collateral_validator_script_hash = mock_script_hash(2)
-  let borrow_iusd_amount = 125_000_000
-  let borrow_outref = mock_utxo_ref(0, 0)
-  let borrow_key_hash = mock_pub_key_hash(0)
-  let borrower_iusd_balance = 400_000_000
-  let iusd_pid = mock_policy_id(8)
-  let iusd_an = "iUSD"
-  let st_can_be_borrowed = borrow_iusd_amount // 1 iusd == 1 susd (stable coin)
-  let test_st_policy_id = mock_policy_id(9)
-  let loan_nft_policy_id = mock_policy_id(1)
-  let loan_nft_name = "BorrowNFT1"
-
-  let refunder_input =
-    Input {
-      output_reference: borrow_outref,
-      output: Output {
-        address: Address {
-          payment_credential: VerificationKey(borrow_key_hash),
-          stake_credential: None,
-        },
-        value: assets.merge(
-          assets.merge(
-            assets.merge(
-              from_lovelace(2000000),
-              from_asset(iusd_pid, iusd_an, borrower_iusd_balance - borrow_iusd_amount),
-            ),
-            from_asset(test_st_policy_id, st_stable_asset_name, st_can_be_borrowed),
-          ),
-          from_asset(loan_nft_policy_id, loan_nft_name, 1),
+        Pair(
+          test_st_policy_id,
+          [Pair(st_stable_asset_name, -st_can_be_borrowed)],
         ),
-        datum: NoDatum,
-        reference_script: None,
-      },
-    }
-
-  let collateral_asset_amount = borrow_iusd_amount
-  let collateral_validator_input =
-    Input {
-      output_reference: mock_utxo_ref(0, 1),
-      output: Output {
-        address: Address {
-          payment_credential: Script(collateral_validator_script_hash),
-          stake_credential: None,
-        },
-        value: assets.merge(
-          from_lovelace(2000000),
-          from_asset(iusd_pid, iusd_an, collateral_asset_amount),
-        ),
-        datum: InlineDatum(
-          CollateralDatum {
-            st_policy_id: test_st_policy_id,
-            st_asset_name: st_stable_asset_name,
-            st_borrowed: st_can_be_borrowed,
-            loan_nft_pid: loan_nft_policy_id,
-            loan_nft_asset_name: loan_nft_name,
-            collateral_rate_at_lending_precised: 1,
-            collateral_asset: AssetType {
-              is_stable: True,
-              policy_id: iusd_pid,
-              asset_name: iusd_an,
-            },
-            collateral_asset_amount,
-          },
-        ),
-        reference_script: None,
-      }
-    }
-
-  let refunder_output =
-    Output {
-      address: Address {
-        payment_credential: VerificationKey(borrow_key_hash),
-        stake_credential: None,
-      },
-      value: assets.merge(
-        from_lovelace(2000000),
-        from_asset(iusd_pid, iusd_an, borrower_iusd_balance),
-      ),
-      datum: NoDatum,
-      reference_script: None,
-    }
-
-  let mint =
-    from_asset_list(
-      [
-        Pair(loan_nft_policy_id, [Pair(loan_nft_name, -1)]),
-        Pair(test_st_policy_id, [Pair(st_stable_asset_name, -st_can_be_borrowed)]),
       ],
     )
 

@@ -1,4 +1,4 @@
-name = "halalend/halalend-protocol"
+name = "stateralabs/statera-protocol"
 version = "0.0.0"
 compiler = "v1.1.13"
 plutus = "v3"
@@ -6,8 +6,8 @@ license = "Apache-2.0"
 description = "Aiken contracts for project 'halalend/halalend-protocol'"
 
 [repository]
-user = "halalend"
-project = "halalend-protocol"
+user = "stateralabs"
+project = "statera-protocol"
 platform = "github"
 
 [[dependencies]]

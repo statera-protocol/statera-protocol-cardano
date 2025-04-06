@@ -12,5 +12,8 @@ pub const st_oracle_asset_name = #"53544f"
 // "STP"
 pub const st_pparams_asset_name = #"535450"
 
+// "STL"
+pub const st_liquidation_asset_name = #"53544c"
+
 // staterites (sUSD subnuits (1_000_000 staterites == 1 sUSD))
 pub const st_stable_asset_name = #"73746174657269746573"

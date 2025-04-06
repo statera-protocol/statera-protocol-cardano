@@ -1,14 +1,6 @@
-use aiken/crypto.{VerificationKeyHash}
+use aiken/crypto.{ScriptHash, VerificationKeyHash}
 use cardano/assets.{AssetName, PolicyId}
 use statera/types.{AssetRate, AssetType}
-
-pub type ProtocolParametersDatum {
-  min_collateral_ratio: Int,
-  min_liquidation_threshold: Int,
-  min_loan_amount: Int,
-  protocol_usage_fee: Int,
-  collateral_assets: List<AssetType>,
-}
 
 pub type CollateralValidatorDatum {
   CollateralDatum {
@@ -25,5 +17,14 @@ pub type CollateralValidatorDatum {
   DepositorDatum { depositor_vkh: VerificationKeyHash }
 }
 
-pub type OracleDatum =
-  List<AssetRate>
+pub type ControlDatum {
+  OracleDatum { oracle_rates: List<AssetRate> }
+  ProtocolParametersDatum {
+    min_collateral_ratio: Int,
+    min_liquidation_threshold: Int,
+    min_loan_amount: Int,
+    protocol_usage_fee: Int,
+    collateral_assets: List<AssetType>,
+  }
+  LiqFundsDatum { receiver: ScriptHash }
+}

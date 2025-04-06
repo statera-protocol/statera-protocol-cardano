@@ -11,3 +11,17 @@ pub type AssetRate {
   num: Int,
   denum: Int,
 }
+
+pub type MintControl {
+  InitOracle
+  InitProtocolParams
+  InitLiqFundsReceiver
+  RemoveControlMint
+}
+
+pub type SpendControl {
+  UpdateOracle
+  UpdateProtocolParams
+  UpdateLiqFundsReceiver
+  RemoveControlSpend
+}

@@ -6,7 +6,7 @@ use cardano/assets.{PolicyId, Value, from_asset, from_lovelace}
 use cardano/transaction.{InlineDatum, Input, Output, Transaction, placeholder}
 use mocktail/virgin_key_hash.{mock_policy_id, mock_script_hash}
 use mocktail/virgin_output_reference.{mock_utxo_ref}
-use statera/constants.{st_stable_asset_name, precision_factor}
+use statera/constants.{precision_factor, st_stable_asset_name}
 use statera/datums.{CollateralDatum, CollateralValidatorDatum}
 use statera/types.{AssetType}
 
@@ -14,8 +14,6 @@ pub type MintLoanRedeemer {
   GetLoan
   RepayLoan
   PartialRepay
-  // To be removed. Just for testing and creating oracle utxo
-  GetStables
 }
 
 validator mint_loan_validator(collateral_validator_hash: ScriptHash) {
@@ -34,7 +32,6 @@ validator mint_loan_validator(collateral_validator_hash: ScriptHash) {
           policy_id,
           redeemer,
         )
-      GetStables -> True
     }
   }
 
@@ -49,27 +46,13 @@ fn validate_get_loan(
   mint: Value,
   policy_id: PolicyId,
 ) {
-  expect Some(collateral_output) =
-    list.find(
-      outputs,
-      fn(output) {
-        and {
-          (output.address.payment_credential == Script(
-            collateral_validator_hash,
-          ))?,
-          when output.datum is {
-            InlineDatum(output_datum) ->
-              if output_datum
-              is CollateralDatum { .. }: CollateralValidatorDatum {
-                True
-              } else {
-                False
-              }
-            _ -> False
-          },
-        }
-      },
-    )
+  let collateral_outputs =
+    filter_collateral_outputs(outputs, collateral_validator_hash)
+
+  // Must be one collateral_output
+  expect list.length(collateral_outputs) == 1
+
+  expect Some(collateral_output) = list.at(collateral_outputs, 0)
 
   expect InlineDatum(collateral_output_datum) = collateral_output.datum
 
@@ -130,27 +113,13 @@ fn validate_repay_and_partial_repay_loan(
   when redeemer is {
     RepayLoan -> (quantity == -st_borrowed)?
     PartialRepay -> {
-      expect Some(collateral_output) =
-        list.find(
-          outputs,
-          fn(output) {
-            and {
-              output.address.payment_credential == Script(
-                collateral_validator_hash,
-              ),
-              when output.datum is {
-                InlineDatum(output_datum) ->
-                  if output_datum
-                  is CollateralDatum { .. }: CollateralValidatorDatum {
-                    True
-                  } else {
-                    False
-                  }
-                _ -> False
-              },
-            }
-          },
-        )
+      let collateral_outputs =
+        filter_collateral_outputs(outputs, collateral_validator_hash)
+
+      // Must be one collateral_output
+      expect list.length(collateral_outputs) == 1
+
+      expect Some(collateral_output) = list.at(collateral_outputs, 0)
       expect InlineDatum(collateral_output_datum) = collateral_output.datum
       expect CollateralDatum { st_borrowed: output_st_borrowed, .. } =
         collateral_output_datum
@@ -159,6 +128,30 @@ fn validate_repay_and_partial_repay_loan(
     }
     _ -> False
   }
+}
+
+fn filter_collateral_outputs(
+  outputs: List<Output>,
+  collateral_validator_hash: ScriptHash,
+) {
+  list.filter(
+    outputs,
+    fn(output) {
+      and {
+        (output.address.payment_credential == Script(collateral_validator_hash))?,
+        when output.datum is {
+          InlineDatum(output_datum) ->
+            if output_datum
+            is CollateralDatum { .. }: CollateralValidatorDatum {
+              True
+            } else {
+              False
+            }
+          _ -> False
+        },
+      }
+    },
+  )
 }
 
 // Tests
@@ -327,7 +320,8 @@ test test_partial_repay_burn() {
       reference_script: None,
     }
 
-  let mint = from_asset(test_st_policy_id, st_stable_asset_name, -loan_token_burn_amount)
+  let mint =
+    from_asset(test_st_policy_id, st_stable_asset_name, -loan_token_burn_amount)
 
   let tx =
     Transaction {
