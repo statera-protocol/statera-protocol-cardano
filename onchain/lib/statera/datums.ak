@@ -1,4 +1,5 @@
 use aiken/crypto.{ScriptHash, VerificationKeyHash}
+use cardano/address.{Address, Credential}
 use cardano/assets.{AssetName, PolicyId}
 use statera/types.{AssetRate, AssetType}
 
@@ -9,8 +10,8 @@ pub type CollateralValidatorDatum {
     st_borrowed: Int,
     loan_nft_pid: PolicyId,
     loan_nft_asset_name: AssetName,
-    collateral_rate_at_lending_precised: Int,
     // asset per usd precised (multiplied) with 'precision_factor'
+    collateral_rate_at_lending_precised: Int,
     collateral_asset: AssetType,
     collateral_asset_amount: Int,
   }
@@ -24,7 +25,24 @@ pub type ControlDatum {
     min_liquidation_threshold: Int,
     min_loan_amount: Int,
     protocol_usage_fee: Int,
+    st_asset: AssetType,
     collateral_assets: List<AssetType>,
+    swappable_assets: List<AssetType>,
+    authorized_batchers: List<VerificationKeyHash>,
   }
   LiqFundsDatum { receiver: ScriptHash }
+}
+
+pub type PoolDatum {
+  pool_batching_cred: Credential,
+}
+
+pub type OrderType {
+  Buy
+  Sell
+}
+
+pub type OrderDatum {
+  order_type: OrderType,
+  receiver_address: Address,
 }

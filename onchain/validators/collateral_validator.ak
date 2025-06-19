@@ -23,32 +23,22 @@ use statera/datums.{
   CollateralDatum, CollateralValidatorDatum, DepositorDatum, LiqFundsDatum,
   OracleDatum, ProtocolParametersDatum,
 }
-use statera/types.{AssetRate, AssetType}
+use statera/test_fns.{get_protocol_parameters_ref}
+use statera/types.{
+  AssetRate, AssetType, CollateralValidatorRedeemer, IncreaseCollateral,
+  IncreaseDeposit, Liquidate, PartialRepayment, PartialWithdrawal, Refund,
+  WithdrawDeposit,
+}
 use statera/utils.{
   calculate_by_percentage, filter_inputs_by_vkh, find_oracle_rate,
   find_output_by_hash, find_output_by_vkh, find_ucv_ref_input,
   get_user_asset_amt_in_out, signed_by,
 }
 
-pub type Action {
-  Refund
-  Liquidate
-  WithdrawDeposit
-  IncreaseDeposit
-  PartialWithdrawal
-  IncreaseCollateral
-  PartialRepayment
-}
-
-validator collateral_validator(
-  // protocol_parameters_hash: ScriptHash,
-  // oracle_hash: ScriptHash,
-  // liquidated_funds_collector_hash: ScriptHash,
-  unified_control_validator_hash: ScriptHash,
-) {
+validator collateral_validator(unified_control_validator_hash: ScriptHash) {
   spend(
     datum: Option<CollateralValidatorDatum>,
-    redeemer: Action,
+    redeemer: CollateralValidatorRedeemer,
     o_ref: OutputReference,
     self: Transaction,
   ) {
@@ -90,6 +80,7 @@ validator collateral_validator(
   mint(_redeemer: Data, policy_id: PolicyId, self: Transaction) {
     let Transaction { inputs, outputs, mint, .. } = self
 
+    // find user deposit output - value deposited by a user into the protocol through a utxo to the collateral validator (first deposit)
     expect Some(deposit_output) = find_output_by_hash(outputs, policy_id)
 
     expect InlineDatum(deposit_output_datum) = deposit_output.datum
@@ -124,10 +115,13 @@ validator collateral_validator(
         identifier_name == identifier_token_name,
         identifier_quantity == 1,
       }
+    // receipt should go to the user wallet address
     let is_receipt_to_depositor =
       quantity_of(output_to_depositor.value, policy_id, receipt_name) == 1
+    // identifier should go the user's deposit utxo on the protocol (on the collateral validator)
     let is_identifier_to_own_script =
       quantity_of(deposit_output.value, policy_id, identifier_name) == 1
+    // total ada input should be >= the amount of ada a user deposited into the protocol
     let is_deposit_ada_amount_valid =
       depositor_inputs_total_ada >= lovelace_of(deposit_output.value)
 
@@ -147,7 +141,7 @@ validator collateral_validator(
 fn handle_collateral(
   unified_control_validator_hash: ScriptHash,
   datum: Option<CollateralValidatorDatum>,
-  redeemer: Action,
+  redeemer: CollateralValidatorRedeemer,
   mint: Value,
   outputs: List<Output>,
   reference_inputs: List<Input>,
@@ -427,12 +421,12 @@ fn handle_increase_collateral(
     if collateral_asset_pid == "" {
       (lovelace_of(collateral_output.value) == expected_new_collateral_balance)?
     } else {
-      trace @"qtof..": quantity_of(
-        collateral_output.value,
-        collateral_asset_pid,
-        collateral_asset_an,
-      )
-      trace @"expected_new_collateral_balance": expected_new_collateral_balance
+      // trace @"qtof..": quantity_of(
+      //   collateral_output.value,
+      //   collateral_asset_pid,
+      //   collateral_asset_an,
+      // )
+      // trace @"expected_new_collateral_balance": expected_new_collateral_balance
       (quantity_of(
         collateral_output.value,
         collateral_asset_pid,
@@ -546,7 +540,6 @@ fn handle_partial_repayment(
   // Check for loan amount burning and burned amount
   expect [Pair(loan_token_name, loan_token_burn_quantity)] =
     mint |> assets.tokens(st_policy_id) |> dict.to_pairs
-  expect loan_token_burn_quantity < 0
 
   expect Some(collateral_output) =
     list.find(
@@ -612,11 +605,12 @@ fn handle_partial_repayment(
       st_policy_id,
       st_asset_name,
     )
+  // calculate the quantity of loan tokens being repayed
   let user_st_amount_given =
     user_wallet_total_st_asset_input - user_wallet_total_st_asset_output
+  // trace @"user_st_amount_given": user_st_amount_given
+  // trace @"loan_token_burn_quantity": loan_token_burn_quantity
   // Make sure loan_token_burn_quantity is the exact same amount of st going out of the user's wallet
-  trace @"user_st_amount_given": user_st_amount_given
-  trace @"loan_token_burn_quantity": loan_token_burn_quantity
   expect user_st_amount_given == -1 * loan_token_burn_quantity
 
   // calculate the amount of remaining unpaid loan
@@ -641,7 +635,7 @@ fn handle_partial_repayment(
 
 fn handle_withdraw_and_increase_deposit(
   datum: Option<CollateralValidatorDatum>,
-  redeemer: Action,
+  redeemer: CollateralValidatorRedeemer,
   extra_signatories: List<VerificationKeyHash>,
   own_input: Input,
   outputs: List<Output>,
@@ -680,33 +674,25 @@ fn handle_withdraw_and_increase_deposit(
       expect and {
           (depositor_vkh == output_depositor_vkh)?,
           signed_by(extra_signatories, depositor_vkh)?,
+          // Make sure that the identifier token is sent with the deposit and no other asset is sent
+          (assets.without_lovelace(deposit_output.value) == from_asset(
+            own_hash,
+            identifier_token_name,
+            1,
+          ))?,
         }
 
       when redeemer is {
-        IncreaseDeposit -> and {
-            // To allow for increase deposit, total deposit has to be greater than initial balance
-            (lovelace_of(deposit_output.value) > lovelace_of(
-              own_input.output.value,
-            ))?,
-            // Make sure that the identifier token is sent with the deposit and no other asset is sent
-            (assets.without_lovelace(deposit_output.value) == from_asset(
-              own_hash,
-              identifier_token_name,
-              1,
-            ))?,
-          }
-        PartialWithdrawal -> and {
-            // To allow for partial withdrawal, final balance has to be less than initial balance
-            (lovelace_of(deposit_output.value) < lovelace_of(
-              own_input.output.value,
-            ))?,
-            // Make sure that the identifier token is sent with the deposit and no other asset is sent
-            (assets.without_lovelace(deposit_output.value) == from_asset(
-              own_hash,
-              identifier_token_name,
-              1,
-            ))?,
-          }
+        IncreaseDeposit ->
+          // To allow for increase deposit, total deposit has to be greater than initial balance
+          (lovelace_of(deposit_output.value) > lovelace_of(
+            own_input.output.value,
+          ))?
+        PartialWithdrawal ->
+          // To allow for partial withdrawal, final balance has to be less than initial balance
+          (lovelace_of(deposit_output.value) < lovelace_of(
+            own_input.output.value,
+          ))?
         _ -> False
       }
     }
@@ -787,46 +773,7 @@ test test_liquidate_loan_with_liquidation_threshold_reached() {
 
   let (collateral_datum, collateral_input) = get_collateral_details()
 
-  let protocol_parameters_ref =
-    Input {
-      output_reference: mock_utxo_ref(0, 1),
-      output: Output {
-        address: Address {
-          payment_credential: Script(unified_control_validator_hash),
-          stake_credential: None,
-        },
-        value: assets.merge(
-          from_lovelace(2000000),
-          from_asset(unified_control_validator_hash, st_pparams_asset_name, 1),
-        ),
-        datum: InlineDatum(
-          ProtocolParametersDatum {
-            min_collateral_ratio: 150,
-            min_liquidation_threshold: 120,
-            min_loan_amount: 10,
-            protocol_usage_fee: 2,
-            collateral_assets: [
-              AssetType {
-                is_stable: False,
-                policy_id: "",
-                asset_name: "lovelace",
-              },
-              AssetType {
-                is_stable: True,
-                policy_id: mock_policy_id(0),
-                asset_name: "iUSD",
-              },
-              AssetType {
-                is_stable: False,
-                policy_id: mock_policy_id(1),
-                asset_name: "hosky",
-              },
-            ],
-          },
-        ),
-        reference_script: None,
-      },
-    }
+  let protocol_parameters_ref = get_protocol_parameters_ref()
 
   let oracle_ref =
     Input {

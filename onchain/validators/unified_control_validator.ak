@@ -7,10 +7,13 @@ use cardano/assets.{AssetName, PolicyId, from_asset, from_lovelace, quantity_of}
 use cardano/transaction.{
   InlineDatum, Input, NoDatum, Output, OutputReference, Transaction, placeholder,
 }
-use mocktail/virgin_key_hash.{mock_policy_id, mock_script_hash}
+use mocktail/virgin_key_hash.{
+  mock_policy_id, mock_pub_key_hash, mock_script_hash,
+}
 use mocktail/virgin_output_reference.{mock_utxo_ref}
 use statera/constants.{
   st_liquidation_asset_name, st_oracle_asset_name, st_pparams_asset_name,
+  st_stable_asset_name,
 }
 use statera/datums.{
   ControlDatum, LiqFundsDatum, OracleDatum, ProtocolParametersDatum,
@@ -101,7 +104,7 @@ fn validate_remove_control_spend(
           }
 
         or {
-          // No new control should be createdx during removal
+          // No new control should be created during removal
           is_control_datum,
           // No asset should be allowed out; All has to be burned
           is_asset_out,
@@ -200,7 +203,7 @@ fn validate_control_input(
   }
 
   and {
-    // Must be a UTxO going to own hash
+    // Must be a UTxO from own hash
     input.output.address.payment_credential == Script(own_hash),
     // Must only contain "STO" or "STP" or "STL" token apart from ADA
     assets.without_lovelace(input.output.value) == from_asset(
@@ -438,6 +441,11 @@ test test_init_protocol_params() {
           min_liquidation_threshold: 120,
           min_loan_amount: 10,
           protocol_usage_fee: 2,
+          st_asset: AssetType {
+            is_stable: True,
+            policy_id: mock_policy_id(21),
+            asset_name: st_stable_asset_name,
+          },
           collateral_assets: [
             AssetType {
               is_stable: False,
@@ -455,6 +463,14 @@ test test_init_protocol_params() {
               asset_name: "hosky",
             },
           ],
+          swappable_assets: [
+            AssetType {
+              is_stable: True,
+              policy_id: mock_policy_id(13),
+              asset_name: "usdm",
+            },
+          ],
+          authorized_batchers: [mock_pub_key_hash(0)],
         },
       ),
       reference_script: None,
@@ -587,6 +603,11 @@ test test_update_protocol_params() {
       min_liquidation_threshold: 120,
       min_loan_amount: 10,
       protocol_usage_fee: 2,
+      st_asset: AssetType {
+        is_stable: True,
+        policy_id: mock_policy_id(21),
+        asset_name: st_stable_asset_name,
+      },
       collateral_assets: [
         AssetType { is_stable: False, policy_id: "", asset_name: "lovelace" },
         AssetType {
@@ -600,6 +621,14 @@ test test_update_protocol_params() {
           asset_name: "hosky",
         },
       ],
+      swappable_assets: [
+        AssetType {
+          is_stable: True,
+          policy_id: mock_policy_id(13),
+          asset_name: "usdm",
+        },
+      ],
+      authorized_batchers: [mock_pub_key_hash(0)],
     }
   let pparams_input_utxo_ref = mock_utxo_ref(0, 11)
   let pparams_input =
@@ -629,6 +658,11 @@ test test_update_protocol_params() {
           min_liquidation_threshold: 120,
           min_loan_amount: 10,
           protocol_usage_fee: 2,
+          st_asset: AssetType {
+            is_stable: True,
+            policy_id: mock_policy_id(21),
+            asset_name: st_stable_asset_name,
+          },
           collateral_assets: [
             AssetType {
               is_stable: False,
@@ -648,6 +682,14 @@ test test_update_protocol_params() {
               asset_name: "hosky",
             },
           ],
+          swappable_assets: [
+            AssetType {
+              is_stable: True,
+              policy_id: mock_policy_id(13),
+              asset_name: "usdm",
+            },
+          ],
+          authorized_batchers: [mock_pub_key_hash(0)],
         },
       ),
       reference_script: None,

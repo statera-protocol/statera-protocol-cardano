@@ -23,6 +23,7 @@ use statera/datums.{
   CollateralDatum, CollateralValidatorDatum, DepositorDatum, OracleDatum,
   ProtocolParametersDatum,
 }
+use statera/test_fns.{get_protocol_parameters_ref}
 use statera/types.{AssetRate, AssetType}
 use statera/utils.{
   calculate_by_percentage, find_oracle_rate, find_ucv_ref_input,
@@ -79,7 +80,7 @@ fn validate_mint_borrow_nft(
   outputs: List<Output>,
   borrow_utxo: OutputReference,
 ) {
-  // find collateral output going to collateral validator script and make sure it's datum is of type CollateralDatum
+  // find collateral output going to collateral validator script and make sure it's datum is of type "CollateralDatum"
   expect Some(collateral_output) =
     list.find(
       outputs,
@@ -123,6 +124,7 @@ fn validate_mint_borrow_nft(
     ..
   } = collateral_asset
 
+  // value of loan amount (ada or other token) in the collateral output utxo must be equal to the amount info in it's datum
   let is_borrow_amount_valid =
     if collateral_asset_pid == "" {
       lovelace_of(collateral_output.value) == collateral_asset_amount
@@ -134,9 +136,11 @@ fn validate_mint_borrow_nft(
       ) == collateral_asset_amount
     }
 
+  // loan nft mint
   expect [Pair(nft_asset_name, nft_quantity)] =
     mint |> assets.tokens(policy_id) |> dict.to_pairs
 
+  // loan tokens (statera) mint
   expect [Pair(_, mint_loan_quantity)] =
     mint |> assets.tokens(st_policy_id) |> dict.to_pairs
   let is_loan_mint_quantity_valid = mint_loan_quantity == st_borrowed
@@ -170,8 +174,11 @@ fn validate_mint_borrow_nft(
       )
     }
 
+  // amount of staterites going to the user's address as loan should be the same as the amount of staterites
+  // in the collateral output datum
   let is_st_borrowed_valid_in_datum = borrow_output_st == st_borrowed
 
+  // Loan nft policy id must be valid in collateral datum
   let loan_nft_pid_valid_in_datum = loan_nft_pid == policy_id
 
   // Can mint only one loan NFT
@@ -218,7 +225,7 @@ fn validate_protocol_parameters(
   collateral_asset_an: AssetName,
   collateral_asset: AssetType,
 ) {
-  trace @"in validate_protocol_parameters()"
+  // trace @"in validate_protocol_parameters()"
 
   expect Some(protocol_parameters_ref) =
     find_ucv_ref_input(
@@ -240,10 +247,8 @@ fn validate_protocol_parameters(
   // Make sure collateral asset is allowed
   expect list.has(collateral_assets, collateral_asset)
 
-  trace @"after destructuring protocol parameters"
-
-  // Validating MCR
-  // If asset is a stable coin, no need to calculate with min_collateral ratio. Mint 1:1 with ST tokens
+  // trace @"after destructuring protocol parameters"
+  // Validating MCR - get the 100% value of the amount of collateral asset
   let hundred_percent_col_asset_value =
     calculate_by_percentage(
       collateral_asset_amount * precision_factor,
@@ -251,8 +256,7 @@ fn validate_protocol_parameters(
       100,
     )
 
-  trace @"before is_col_amount_and_rate_valid"
-
+  // trace @"before is_col_amount_and_rate_valid"
   let is_col_amount_and_rate_valid = {
     trace @"inside is_col_amount_and_rate_valid else.."
     let (expected_col_asset_amount, oracle_asset_st_rate) =
@@ -271,6 +275,7 @@ fn validate_protocol_parameters(
 
     and {
       // Both operand below are in product of the precision_factor
+      // amount of collateral asset user provides must correspond with the current rate of the asset
       (hundred_percent_col_asset_value >= expected_col_asset_amount)?,
       // Oracle usd rate is same as the one in datum
       (oracle_asset_st_rate == collateral_rate_at_lending_precised)?,
@@ -304,23 +309,21 @@ fn get_expected_col_asset_amount(
       st_oracle_asset_name,
     )
 
-  trace @"in get_expected_col_asset_amount immediately after expecting oracle_ref"
-
+  // trace @"in get_expected_col_asset_amount immediately after expecting oracle_ref"
   expect Some(oracle_rate) =
     find_oracle_rate(oracle_ref, collateral_asset_pid, collateral_asset_an)
 
-  trace @"in get_expected_col_asset_amount immediately after expecting oracle_rate"
-
+  // trace @"in get_expected_col_asset_amount immediately after expecting oracle_rate"
   let AssetRate { num, denum, .. } = oracle_rate
 
+  // how many lovelaces give one staterite (precised)
   let oracle_asset_st_rate = num * precision_factor / denum
-  // number of asset per usd (for divisible assets: e.g. how many lovelaces per usd)
-  trace @"oracle_asset_st_rate": oracle_asset_st_rate
 
+  // trace @"oracle_asset_st_rate": oracle_asset_st_rate
   let expected_borrow_asset_amount = borrow_output_st * oracle_asset_st_rate
-  trace @"expected_borrow_asset_amount": expected_borrow_asset_amount
-  trace @"borrow_output_st": borrow_output_st
 
+  // trace @"expected_borrow_asset_amount": expected_borrow_asset_amount
+  // trace @"borrow_output_st": borrow_output_st
   (expected_borrow_asset_amount, oracle_asset_st_rate)
 }
 
@@ -423,7 +426,7 @@ fn validate_other_assets_collateral(
   let is_borrow_input_change_returned =
     user_wallet_total_col_asset_input - collateral_asset_amount == user_wallet_total_col_asset_output
 
-  // find a borrow output that has the loan NFT is going to the user wallet address
+  // find a borrow output that has the loan NFT and is going to the user wallet address
   expect Some(borrow_output) =
     outputs
       |> list.find(
@@ -439,7 +442,6 @@ fn validate_other_assets_collateral(
   let borrow_output_st =
     quantity_of(borrow_output.value, st_policy_id, st_asset_name)
 
-  // trace @"is_borrow_input_change_returned": is_borrow_input_change_returned, True, "mmm"
   (is_borrow_input_change_returned, borrow_output_st)
 }
 
@@ -449,6 +451,7 @@ fn validate_burn_borrow_nft(
   mint: Value,
   collateral_validator_hash: ScriptHash,
 ) {
+  // Find an input stored on the collateral validator, with the collateral datum
   expect Some(collateral_input) =
     list.find(
       inputs,
@@ -486,9 +489,11 @@ fn validate_burn_borrow_nft(
 
   let AssetType { policy_id: collateral_asset_pid, .. } = collateral_asset
 
+  // loan nft mint
   expect [Pair(loan_nft_name, quantity)] =
     mint |> assets.tokens(loan_nft_pid) |> dict.to_pairs
 
+  // loan nft must be burned and it's asset name must correspond to what is in the collateral utxo datum
   let is_loan_nft_burned = and {
       (quantity == -1)?,
       (loan_nft_asset_name == loan_nft_name)?,
@@ -565,7 +570,7 @@ fn validate_user_ada_input_output(
   expect InlineDatum(user_balance_input_datum) = user_balance_input.output.datum
   expect DepositorDatum { depositor_vkh } = user_balance_input_datum
 
-  // Find the loan NFT; make sure the loan NFT provider is the one whose whose balance will be update
+  // Find the loan NFT; make sure the loan NFT provider is the one whose whose balance will be updated
   expect Some(_loan_nft_refunder_input) =
     inputs
       |> list.find(
@@ -687,53 +692,6 @@ fn validate_user_other_asset_input_output(
 }
 
 // Tests
-fn get_protocol_parameters_ref() {
-  let unified_control_validator_hash = mock_script_hash(1)
-
-  let protocol_parameters_ref =
-    Input {
-      output_reference: mock_utxo_ref(0, 1),
-      output: Output {
-        address: Address {
-          payment_credential: Script(unified_control_validator_hash),
-          stake_credential: None,
-        },
-        value: assets.merge(
-          from_lovelace(2000000),
-          from_asset(unified_control_validator_hash, st_pparams_asset_name, 1),
-        ),
-        datum: InlineDatum(
-          ProtocolParametersDatum {
-            min_collateral_ratio: 150,
-            min_liquidation_threshold: 120,
-            min_loan_amount: 10,
-            protocol_usage_fee: 2,
-            collateral_assets: [
-              AssetType {
-                is_stable: False,
-                policy_id: "",
-                asset_name: "lovelace",
-              },
-              AssetType {
-                is_stable: True,
-                policy_id: mock_policy_id(8),
-                asset_name: "iUSD",
-              },
-              AssetType {
-                is_stable: False,
-                policy_id: mock_policy_id(7),
-                asset_name: "hosky",
-              },
-            ],
-          },
-        ),
-        reference_script: None,
-      },
-    }
-
-  protocol_parameters_ref
-}
-
 fn get_oracle_ref(unit: ByteArray, num: Int, denum: Int) {
   let unified_control_validator_hash = mock_script_hash(1)
 
@@ -812,7 +770,6 @@ test test_borrow_with_ada_collateral() {
           loan_nft_asset_name: loan_nft_name,
           // 1.2 lovelaces (per staterites)
           collateral_rate_at_lending_precised: 12 * precision_factor / 10,
-          // lovelaces per usd
           collateral_asset: AssetType {
             is_stable: False,
             policy_id: "",

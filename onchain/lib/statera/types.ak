@@ -25,3 +25,28 @@ pub type SpendControl {
   UpdateLiqFundsReceiver
   RemoveControlSpend
 }
+
+pub type CollateralValidatorRedeemer {
+  Refund
+  Liquidate
+  WithdrawDeposit
+  IncreaseDeposit
+  PartialWithdrawal
+  IncreaseCollateral
+  PartialRepayment
+}
+
+pub type MintStRedeemer {
+  GetLoan
+  RepayLoan
+  PartialRepay
+  Swap
+}
+
+pub type PoolBatchingRedeemer {
+  batcher_index: Int,
+  pool_asset: AssetType,
+}
+
+pub type BatchingType =
+  (Int, Int)

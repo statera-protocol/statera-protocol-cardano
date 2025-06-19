@@ -1,24 +1,24 @@
 use aiken/collection/dict
 use aiken/collection/list
+use aiken/collection/pairs
 use aiken/crypto.{ScriptHash}
-use cardano/address.{Address, Script}
+use cardano/address.{Address, Credential, Script}
 use cardano/assets.{PolicyId, Value, from_asset, from_lovelace}
 use cardano/transaction.{InlineDatum, Input, Output, Transaction, placeholder}
 use mocktail/virgin_key_hash.{mock_policy_id, mock_script_hash}
 use mocktail/virgin_output_reference.{mock_utxo_ref}
 use statera/constants.{precision_factor, st_stable_asset_name}
 use statera/datums.{CollateralDatum, CollateralValidatorDatum}
-use statera/types.{AssetType}
-
-pub type MintLoanRedeemer {
-  GetLoan
-  RepayLoan
-  PartialRepay
+use statera/types.{
+  AssetType, GetLoan, MintStRedeemer, PartialRepay, RepayLoan, Swap,
 }
 
-validator mint_loan_validator(collateral_validator_hash: ScriptHash) {
-  mint(redeemer: MintLoanRedeemer, policy_id: PolicyId, self: Transaction) {
-    let Transaction { inputs, outputs, mint, .. } = self
+validator mint_st_validator(
+  collateral_validator_hash: ScriptHash,
+  pool_batching_cred: Credential,
+) {
+  mint(redeemer: MintStRedeemer, policy_id: PolicyId, self: Transaction) {
+    let Transaction { inputs, outputs, mint, withdrawals, .. } = self
 
     when redeemer is {
       GetLoan ->
@@ -32,6 +32,7 @@ validator mint_loan_validator(collateral_validator_hash: ScriptHash) {
           policy_id,
           redeemer,
         )
+      Swap -> pairs.has_key(withdrawals, pool_batching_cred)
     }
   }
 
@@ -82,7 +83,7 @@ fn validate_repay_and_partial_repay_loan(
   outputs: List<Output>,
   mint: Value,
   policy_id: PolicyId,
-  redeemer: MintLoanRedeemer,
+  redeemer: MintStRedeemer,
 ) {
   expect Some(collateral_input) =
     list.find(
@@ -156,6 +157,8 @@ fn filter_collateral_outputs(
 
 // Tests
 test test_mint_loan_tokens() {
+  let pool_batching_sh = Script(mock_script_hash(5))
+
   let loan_nft_policy_id = mock_policy_id(1)
   let collateral_validator_script_hash = mock_script_hash(2)
   let test_st_policy_id = mock_script_hash(3)
@@ -196,8 +199,9 @@ test test_mint_loan_tokens() {
       mint: mint,
     }
 
-  mint_loan_validator.mint(
+  mint_st_validator.mint(
     collateral_validator_script_hash,
+    pool_batching_sh,
     GetLoan,
     test_st_policy_id,
     tx,
@@ -205,6 +209,8 @@ test test_mint_loan_tokens() {
 }
 
 test test_burn_loan_tokens() {
+  let pool_batching_sh = Script(mock_script_hash(5))
+
   let loan_nft_policy_id = mock_policy_id(1)
   let collateral_validator_script_hash = mock_script_hash(2)
   let test_st_policy_id = mock_script_hash(3)
@@ -249,8 +255,9 @@ test test_burn_loan_tokens() {
       mint: mint,
     }
 
-  mint_loan_validator.mint(
+  mint_st_validator.mint(
     collateral_validator_script_hash,
+    pool_batching_sh,
     RepayLoan,
     test_st_policy_id,
     tx,
@@ -258,6 +265,8 @@ test test_burn_loan_tokens() {
 }
 
 test test_partial_repay_burn() {
+  let pool_batching_sh = Script(mock_script_hash(5))
+
   let loan_token_burn_amount = 6_000_000
   let loan_nft_policy_id = mock_policy_id(1)
   let collateral_validator_script_hash = mock_script_hash(2)
@@ -331,8 +340,9 @@ test test_partial_repay_burn() {
       mint: mint,
     }
 
-  mint_loan_validator.mint(
+  mint_st_validator.mint(
     collateral_validator_script_hash,
+    pool_batching_sh,
     PartialRepay,
     test_st_policy_id,
     tx,
