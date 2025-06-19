@@ -60,6 +60,7 @@ pub fn get_protocol_parameters_ref() {
               },
             ],
             authorized_batchers: [mock_pub_key_hash(0)],
+            admin: mock_script_hash(10),
           },
         ),
         reference_script: None,

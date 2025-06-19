@@ -15,11 +15,13 @@ use mocktail/virgin_key_hash.{
   mock_policy_id, mock_pub_key_hash, mock_script_hash,
 }
 use mocktail/virgin_output_reference.{mock_utxo_ref}
-use statera/constants.{st_pparams_asset_name, st_stable_asset_name}
+use statera/constants.{
+  st_pool_nft_name, st_pparams_asset_name, st_stable_asset_name,
+}
 use statera/datums.{Buy, OrderDatum, PoolDatum, ProtocolParametersDatum, Sell}
 use statera/test_fns.{get_protocol_parameters_ref}
 use statera/types.{AssetType, BatchingType, PoolBatchingRedeemer}
-use statera/utils.{find_ucv_ref_input, signed_by}
+use statera/utils.{find_ucv_ref_input, is_multisig_signing, signed_by}
 
 validator order_validator(pool_batching_cred: Credential) {
   spend(
@@ -36,7 +38,46 @@ validator order_validator(pool_batching_cred: Credential) {
   }
 }
 
-validator pool_validator {
+validator pool_validator(unified_control_validator_hash: ScriptHash) {
+  mint(_redeemer: Data, policy_id: PolicyId, tx: Transaction) {
+    let Transaction { mint, outputs, inputs, reference_inputs, .. } = tx
+
+    expect [Pair(nft_name, quantity)] =
+      mint |> assets.tokens(policy_id) |> dict.to_pairs
+
+    let is_pool_nft_minting = and {
+        nft_name == st_pool_nft_name,
+        quantity == 1,
+      }
+
+    // only one pool output
+    expect Some(pool_output) =
+      list.find(
+        outputs,
+        fn(output) { output.address.payment_credential == Script(policy_id) },
+      )
+
+    // find protocol parameters from reference inputs
+    expect Some(protocol_parameters_ref) =
+      find_ucv_ref_input(
+        reference_inputs,
+        unified_control_validator_hash,
+        st_pparams_asset_name,
+      )
+    expect InlineDatum(protocol_parameters) =
+      protocol_parameters_ref.output.datum
+    expect ProtocolParametersDatum { admin, .. } = protocol_parameters
+
+    and {
+      // pool NFT has to be minted
+      is_pool_nft_minting?,
+      // a pool output with the nft has to exist
+      (quantity_of(pool_output.value, policy_id, st_pool_nft_name) == 1)?,
+      // admin must sign pool creation transaction
+      is_multisig_signing(inputs, admin)?,
+    }
+  }
+
   spend(
     datum: Option<PoolDatum>,
     _redeemer: Data,
@@ -190,10 +231,13 @@ fn verify_pool_utxo(
   and {
     output.address.payment_credential == Script(pool_validator_hash),
     // pool utxo must contain only one asset specified in the pool batching redeemer
-    without_lovelace(output.value) == from_asset(
-      policy_id,
-      asset_name,
-      quantity_of(output.value, policy_id, asset_name),
+    without_lovelace(output.value) == assets.merge(
+      from_asset(
+        policy_id,
+        asset_name,
+        quantity_of(output.value, policy_id, asset_name),
+      ),
+      from_asset(pool_validator_hash, st_pool_nft_name, 1),
     ),
   }
 }
@@ -345,10 +389,9 @@ fn create_pool_batching_tx(
           payment_credential: Script(pool_script_hash),
           stake_credential: None,
         },
-        value: assets.merge(
-          from_lovelace(5_000_000),
-          from_asset(test_usdm_pid, test_usdm_asset_name, 500_000_000),
-        ),
+        value: from_lovelace(5_000_000)
+          |> assets.add(test_usdm_pid, test_usdm_asset_name, 500_000_000)
+          |> assets.add(pool_script_hash, st_pool_nft_name, 1),
         datum: pool_datum,
         reference_script: None,
       },
@@ -361,10 +404,9 @@ fn create_pool_batching_tx(
         payment_credential: Script(pool_script_hash),
         stake_credential: None,
       },
-      value: assets.merge(
-        from_lovelace(5_000_000),
-        from_asset(test_usdm_pid, test_usdm_asset_name, pool_out_quantity),
-      ),
+      value: from_lovelace(5_000_000)
+        |> assets.add(test_usdm_pid, test_usdm_asset_name, pool_out_quantity)
+        |> assets.add(pool_script_hash, st_pool_nft_name, 1),
       datum: pool_datum,
       reference_script: None,
     }
@@ -705,4 +747,57 @@ test test_process_both_buy_and_sell_orders() {
     615_000_000,
     115_000_000,
   )
+}
+
+test test_pool_creation() {
+  let pool_script_hash = mock_script_hash(3)
+  let pool_batching_sh = mock_script_hash(5)
+  let unified_control_validator_hash = mock_script_hash(1)
+
+  let test_usdm_pid = mock_policy_id(13)
+  let test_usdm_asset_name = "usdm"
+
+  let admin_input =
+    Input {
+      output_reference: mock_utxo_ref(0, 10),
+      output: Output {
+        address: Address {
+          payment_credential: Script(mock_script_hash(10)),
+          stake_credential: None,
+        },
+        value: from_lovelace(2000000),
+        datum: NoDatum,
+        reference_script: None,
+      },
+    }
+
+  let pool_datum =
+    InlineDatum(PoolDatum { pool_batching_cred: Script(pool_batching_sh) })
+  let pool_output =
+    Output {
+      address: Address {
+        payment_credential: Script(pool_script_hash),
+        stake_credential: None,
+      },
+      value: from_lovelace(5_000_000)
+        |> assets.add(test_usdm_pid, test_usdm_asset_name, 10_000_000_000)
+        |> assets.add(pool_script_hash, st_pool_nft_name, 1),
+      datum: pool_datum,
+      reference_script: None,
+    }
+
+  let protocol_parameters_ref = get_protocol_parameters_ref()
+
+  let mint = from_asset(pool_script_hash, st_pool_nft_name, 1)
+
+  let tx =
+    Transaction {
+      ..placeholder,
+      inputs: [admin_input],
+      outputs: [pool_output],
+      reference_inputs: [protocol_parameters_ref],
+      mint: mint,
+    }
+
+  pool_validator.mint(unified_control_validator_hash, "", pool_script_hash, tx)
 }

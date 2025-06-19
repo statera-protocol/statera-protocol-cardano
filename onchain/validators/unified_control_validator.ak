@@ -23,6 +23,7 @@ use statera/types.{
   MintControl, RemoveControlMint, RemoveControlSpend, SpendControl,
   UpdateLiqFundsReceiver, UpdateOracle, UpdateProtocolParams,
 }
+use statera/utils.{is_multisig_signing}
 
 validator unified_control_validator(admin_sc: ScriptHash) {
   spend(
@@ -114,12 +115,12 @@ fn validate_remove_control_spend(
 
   and {
     list.length(control_outputs) == 0,
-    is_admin_signing(inputs, admin_sc),
+    is_multisig_signing(inputs, admin_sc),
   }
 }
 
 fn validate_remove_control_mint(inputs: List<Input>, admin_sc: ScriptHash) {
-  is_admin_signing(inputs, admin_sc)
+  is_multisig_signing(inputs, admin_sc)
 }
 
 fn validate_update_control(
@@ -177,7 +178,7 @@ fn validate_update_control_in_out(
   and {
     validate_control_input(own_input, own_hash, which_datum, the_asset_name),
     validate_control_output(outputs, own_hash, which_datum, the_asset_name),
-    is_admin_signing(inputs, admin_sc),
+    is_multisig_signing(inputs, admin_sc),
   }
 }
 
@@ -328,7 +329,8 @@ fn validate_init_control_out(
             expect OracleDatum { .. } = output_datum
           }
           "protocol_parameters_datum" -> {
-            expect ProtocolParametersDatum { .. } = output_datum
+            expect ProtocolParametersDatum { admin, .. } = output_datum
+            expect admin == admin_sc
           }
           "liq_funds_datum" -> {
             expect LiqFundsDatum { .. } = output_datum
@@ -351,15 +353,8 @@ fn validate_init_control_out(
     name == the_asset_name,
     quantity == 1,
     // admin must sign the transaction
-    is_admin_signing(inputs, admin_sc),
+    is_multisig_signing(inputs, admin_sc),
   }
-}
-
-fn is_admin_signing(inputs: List<Input>, admin_sc: ScriptHash) {
-  list.any(
-    inputs,
-    fn(input) { input.output.address.payment_credential == Script(admin_sc) },
-  )
 }
 
 // Tests
@@ -471,6 +466,7 @@ test test_init_protocol_params() {
             },
           ],
           authorized_batchers: [mock_pub_key_hash(0)],
+          admin: admin_sc,
         },
       ),
       reference_script: None,
@@ -629,6 +625,7 @@ test test_update_protocol_params() {
         },
       ],
       authorized_batchers: [mock_pub_key_hash(0)],
+      admin: admin_sc,
     }
   let pparams_input_utxo_ref = mock_utxo_ref(0, 11)
   let pparams_input =
@@ -690,6 +687,7 @@ test test_update_protocol_params() {
             },
           ],
           authorized_batchers: [mock_pub_key_hash(0)],
+          admin: admin_sc,
         },
       ),
       reference_script: None,

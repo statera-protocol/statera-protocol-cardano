@@ -29,6 +29,7 @@ pub type ControlDatum {
     collateral_assets: List<AssetType>,
     swappable_assets: List<AssetType>,
     authorized_batchers: List<VerificationKeyHash>,
+    admin: ScriptHash,
   }
   LiqFundsDatum { receiver: ScriptHash }
 }

@@ -184,3 +184,11 @@ pub fn find_oracle_rate(
     },
   )
 }
+
+/// Multisig signature
+pub fn is_multisig_signing(inputs: List<Input>, admin_sc: ScriptHash) {
+  list.any(
+    inputs,
+    fn(input) { input.output.address.payment_credential == Script(admin_sc) },
+  )
+}
