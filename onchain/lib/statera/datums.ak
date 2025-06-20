@@ -46,4 +46,5 @@ pub type OrderType {
 pub type OrderDatum {
   order_type: OrderType,
   receiver_address: Address,
+  canceller: VerificationKeyHash,
 }

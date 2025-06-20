@@ -8,7 +8,8 @@ use cardano/assets.{
   without_lovelace,
 }
 use cardano/transaction.{
-  InlineDatum, Input, NoDatum, Output, OutputReference, Transaction, placeholder,
+  InlineDatum, Input, NoDatum, Output, OutputReference, Transaction, find_input,
+  placeholder,
 }
 use mocktail/virgin_address.{mock_pub_key_address}
 use mocktail/virgin_key_hash.{
@@ -20,17 +21,43 @@ use statera/constants.{
 }
 use statera/datums.{Buy, OrderDatum, PoolDatum, ProtocolParametersDatum, Sell}
 use statera/test_fns.{get_protocol_parameters_ref}
-use statera/types.{AssetType, BatchingType, PoolBatchingRedeemer}
+use statera/types.{
+  AssetType, BatchingType, CancelOrder, OrderRedeemer, PoolBatchingRedeemer,
+  ProcessOrder,
+}
 use statera/utils.{find_ucv_ref_input, is_multisig_signing, signed_by}
 
 validator order_validator(pool_batching_cred: Credential) {
   spend(
-    _datum: Option<OrderDatum>,
-    _redeemer: Data,
-    _utxo: OutputReference,
+    datum: Option<OrderDatum>,
+    redeemer: OrderRedeemer,
+    utxo: OutputReference,
     tx: Transaction,
   ) {
-    pairs.has_key(tx.withdrawals, pool_batching_cred)
+    let Transaction { inputs, outputs, extra_signatories, withdrawals, .. } = tx
+
+    when redeemer is {
+      CancelOrder -> {
+        expect Some(OrderDatum { receiver_address, canceller, .. }) = datum
+
+        expect Some(order_input) = find_input(inputs, utxo)
+        expect Some(_order_output) =
+          list.find(
+            outputs,
+            fn(output) {
+              // order output must go to 'receiver address'
+              and {
+                output.address == receiver_address,
+                output.value == order_input.output.value,
+              }
+            },
+          )
+
+        signed_by(extra_signatories, canceller)?
+      }
+
+      ProcessOrder -> pairs.has_key(withdrawals, pool_batching_cred)
+    }
   }
 
   else(_) {
@@ -252,7 +279,7 @@ fn process_orders(
   if !list.is_empty(order_inputs) {
     expect [order_input, ..rest_order_inputs] = order_inputs
     expect InlineDatum(order_datum) = order_input.output.datum
-    expect OrderDatum { order_type, receiver_address } = order_datum
+    expect OrderDatum { order_type, receiver_address, .. } = order_datum
 
     let AssetType { policy_id: pool_asset_pid, asset_name: pool_asset_name, .. } =
       pool_asset
@@ -458,7 +485,11 @@ test test_process_buy_order() {
         from_lovelace(3_000_000),
         from_asset(test_usdm_pid, test_usdm_asset_name, 50_000_000),
       ),
-      OrderDatum { order_type: Buy, receiver_address: receiver_address_1 },
+      OrderDatum {
+        order_type: Buy,
+        receiver_address: receiver_address_1,
+        canceller: mock_pub_key_hash(3),
+      },
       1,
     )
   let order_output_1 =
@@ -490,7 +521,11 @@ test test_process_sell_order() {
         from_lovelace(3_000_000),
         from_asset(st_pid, st_stable_asset_name, 50_000_000),
       ),
-      OrderDatum { order_type: Sell, receiver_address: receiver_address_1 },
+      OrderDatum {
+        order_type: Sell,
+        receiver_address: receiver_address_1,
+        canceller: mock_pub_key_hash(3),
+      },
       1,
     )
   let order_output_1 =
@@ -523,7 +558,11 @@ test test_process_several_buy_orders() {
         from_lovelace(3_000_000),
         from_asset(test_usdm_pid, test_usdm_asset_name, 50_000_000),
       ),
-      OrderDatum { order_type: Buy, receiver_address: receiver_address_1 },
+      OrderDatum {
+        order_type: Buy,
+        receiver_address: receiver_address_1,
+        canceller: mock_pub_key_hash(3),
+      },
       1,
     )
   let order_output_1 =
@@ -543,7 +582,11 @@ test test_process_several_buy_orders() {
         from_lovelace(3_000_000),
         from_asset(test_usdm_pid, test_usdm_asset_name, 100_000_000),
       ),
-      OrderDatum { order_type: Buy, receiver_address: receiver_address_2 },
+      OrderDatum {
+        order_type: Buy,
+        receiver_address: receiver_address_2,
+        canceller: mock_pub_key_hash(3),
+      },
       1,
     )
   let order_output_2 =
@@ -563,7 +606,11 @@ test test_process_several_buy_orders() {
         from_lovelace(3_000_000),
         from_asset(test_usdm_pid, test_usdm_asset_name, 70_000_000),
       ),
-      OrderDatum { order_type: Buy, receiver_address: receiver_address_3 },
+      OrderDatum {
+        order_type: Buy,
+        receiver_address: receiver_address_3,
+        canceller: mock_pub_key_hash(3),
+      },
       1,
     )
   let order_output_3 =
@@ -596,7 +643,11 @@ test test_process_several_sell_orders() {
         from_lovelace(3_000_000),
         from_asset(st_pid, st_stable_asset_name, 50_000_000),
       ),
-      OrderDatum { order_type: Sell, receiver_address: receiver_address_1 },
+      OrderDatum {
+        order_type: Sell,
+        receiver_address: receiver_address_1,
+        canceller: mock_pub_key_hash(3),
+      },
       1,
     )
   let order_output_1 =
@@ -616,7 +667,11 @@ test test_process_several_sell_orders() {
         from_lovelace(3_000_000),
         from_asset(st_pid, st_stable_asset_name, 100_000_000),
       ),
-      OrderDatum { order_type: Sell, receiver_address: receiver_address_2 },
+      OrderDatum {
+        order_type: Sell,
+        receiver_address: receiver_address_2,
+        canceller: mock_pub_key_hash(3),
+      },
       1,
     )
   let order_output_2 =
@@ -636,7 +691,11 @@ test test_process_several_sell_orders() {
         from_lovelace(3_000_000),
         from_asset(st_pid, st_stable_asset_name, 70_000_000),
       ),
-      OrderDatum { order_type: Sell, receiver_address: receiver_address_3 },
+      OrderDatum {
+        order_type: Sell,
+        receiver_address: receiver_address_3,
+        canceller: mock_pub_key_hash(3),
+      },
       1,
     )
   let order_output_3 =
@@ -669,7 +728,11 @@ test test_process_both_buy_and_sell_orders() {
         from_lovelace(3_000_000),
         from_asset(st_pid, st_stable_asset_name, 50_000_000),
       ),
-      OrderDatum { order_type: Sell, receiver_address: receiver_address_1 },
+      OrderDatum {
+        order_type: Sell,
+        receiver_address: receiver_address_1,
+        canceller: mock_pub_key_hash(3),
+      },
       1,
     )
   let order_output_1 =
@@ -689,7 +752,11 @@ test test_process_both_buy_and_sell_orders() {
         from_lovelace(3_000_000),
         from_asset(st_pid, st_stable_asset_name, 100_000_000),
       ),
-      OrderDatum { order_type: Sell, receiver_address: receiver_address_2 },
+      OrderDatum {
+        order_type: Sell,
+        receiver_address: receiver_address_2,
+        canceller: mock_pub_key_hash(3),
+      },
       1,
     )
   let order_output_2 =
@@ -709,7 +776,11 @@ test test_process_both_buy_and_sell_orders() {
         from_lovelace(3_000_000),
         from_asset(test_usdm_pid, test_usdm_asset_name, 70_000_000),
       ),
-      OrderDatum { order_type: Buy, receiver_address: receiver_address_3 },
+      OrderDatum {
+        order_type: Buy,
+        receiver_address: receiver_address_3,
+        canceller: mock_pub_key_hash(3),
+      },
       1,
     )
   let order_output_3 =
@@ -729,7 +800,11 @@ test test_process_both_buy_and_sell_orders() {
         from_lovelace(3_000_000),
         from_asset(test_usdm_pid, test_usdm_asset_name, 195_000_000),
       ),
-      OrderDatum { order_type: Buy, receiver_address: receiver_address_4 },
+      OrderDatum {
+        order_type: Buy,
+        receiver_address: receiver_address_4,
+        canceller: mock_pub_key_hash(3),
+      },
       1,
     )
   let order_output_4 =
@@ -800,4 +875,48 @@ test test_pool_creation() {
     }
 
   pool_validator.mint(unified_control_validator_hash, "", pool_script_hash, tx)
+}
+
+test test_cancel_order() {
+  let st_pid = mock_policy_id(21)
+  let pool_batching_sh = mock_script_hash(5)
+  let receiver_address = mock_pub_key_address(1, None)
+  let canceller = mock_pub_key_hash(3)
+
+  let order_datum = OrderDatum { order_type: Sell, receiver_address, canceller }
+
+  let order_input =
+    create_order_input(
+      assets.merge(
+        from_lovelace(3_000_000),
+        from_asset(st_pid, st_stable_asset_name, 50_000_000),
+      ),
+      order_datum,
+      1,
+    )
+
+  let order_output =
+    create_order_output(
+      assets.merge(
+        from_lovelace(3_000_000),
+        from_asset(st_pid, st_stable_asset_name, 50_000_000),
+      ),
+      receiver_address,
+    )
+
+  let tx =
+    Transaction {
+      ..placeholder,
+      inputs: [order_input],
+      outputs: [order_output],
+      extra_signatories: [canceller],
+    }
+
+  order_validator.spend(
+    Script(pool_batching_sh),
+    Some(order_datum),
+    CancelOrder,
+    mock_utxo_ref(1, 0),
+    tx,
+  )
 }

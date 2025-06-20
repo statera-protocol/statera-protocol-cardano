@@ -50,3 +50,8 @@ pub type PoolBatchingRedeemer {
 
 pub type BatchingType =
   (Int, Int)
+
+pub type OrderRedeemer {
+  CancelOrder
+  ProcessOrder
+}
