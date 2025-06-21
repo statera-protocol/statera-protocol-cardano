@@ -29,18 +29,41 @@ use statera/utils.{find_ucv_ref_input, is_multisig_signing, signed_by}
 
 validator order_validator(pool_batching_cred: Credential) {
   spend(
-    datum: Option<OrderDatum>,
-    redeemer: OrderRedeemer,
+    _datum: Option<OrderDatum>,
+    _redeemer: Data,
     utxo: OutputReference,
     tx: Transaction,
   ) {
+    let Transaction { inputs, .. } = tx
+
+    expect Some(order_input) = find_input(inputs, utxo)
+    let Input {
+      output: Output { address: Address { payment_credential, .. }, .. },
+      ..
+    } = order_input
+
+    pairs.has_key(tx.withdrawals, payment_credential)
+  }
+
+  withdraw(redeemer: OrderRedeemer, account: Credential, tx: Transaction) {
     let Transaction { inputs, outputs, extra_signatories, withdrawals, .. } = tx
 
     when redeemer is {
       CancelOrder -> {
-        expect Some(OrderDatum { receiver_address, canceller, .. }) = datum
+        expect Script(own_hash) = account
 
-        expect Some(order_input) = find_input(inputs, utxo)
+        // only one order input when cancelling an order
+        expect [order_input] =
+          list.filter(
+            inputs,
+            fn(input) {
+              input.output.address.payment_credential == Script(own_hash)
+            },
+          )
+
+        expect InlineDatum(order_datum) = order_input.output.datum
+        expect OrderDatum { receiver_address, canceller, .. } = order_datum
+
         expect Some(_order_output) =
           list.find(
             outputs,
@@ -882,6 +905,7 @@ test test_cancel_order() {
   let pool_batching_sh = mock_script_hash(5)
   let receiver_address = mock_pub_key_address(1, None)
   let canceller = mock_pub_key_hash(3)
+  let order_script_hash = mock_script_hash(0)
 
   let order_datum = OrderDatum { order_type: Sell, receiver_address, canceller }
 
@@ -910,13 +934,19 @@ test test_cancel_order() {
       inputs: [order_input],
       outputs: [order_output],
       extra_signatories: [canceller],
+      withdrawals: [Pair(Script(order_script_hash), 0)],
     }
 
   order_validator.spend(
     Script(pool_batching_sh),
     Some(order_datum),
-    CancelOrder,
+    "",
     mock_utxo_ref(1, 0),
+    tx,
+  ) && order_validator.withdraw(
+    Script(pool_batching_sh),
+    CancelOrder,
+    Script(order_script_hash),
     tx,
   )
 }
