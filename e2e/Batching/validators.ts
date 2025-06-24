@@ -1,5 +1,5 @@
-import { applyParamsToScript, builtinByteString, conStr1, resolveScriptHash, serializePlutusScript } from "@meshsdk/core";
-import { blueprint, wallet1VK } from "../setup.js";
+import { applyParamsToScript, builtinByteString, conStr1, resolveScriptHash, serializePlutusScript, serializeRewardAddress } from "@meshsdk/core";
+import { blockchainProvider, blueprint, wallet1VK } from "../setup.js";
 import { UnifiedControlValidatorHash } from "../UnifiedControl/validator.js";
 
 // Pool
@@ -22,12 +22,12 @@ const PoolValidatorAddr = serializePlutusScript(
 console.log("PoolValidatorHash:", PoolValidatorHash);
 
 // Pool Batching
-const PoolBatchingValidator = blueprint.validators.filter(v => 
+const BatchingValidator = blueprint.validators.filter(v => 
     v.title.includes("pool_validators.pool_batching_validator.withdraw")
 );
 
-const PoolBatchingValidatorScript = applyParamsToScript(
-    PoolBatchingValidator[0].compiledCode,
+const BatchingValidatorScript = applyParamsToScript(
+    BatchingValidator[0].compiledCode,
     [
         builtinByteString(UnifiedControlValidatorHash),
         builtinByteString(PoolValidatorHash),
@@ -35,13 +35,19 @@ const PoolBatchingValidatorScript = applyParamsToScript(
     "JSON"
 );
 
-const PoolBatchingValidatorHash = resolveScriptHash(PoolBatchingValidatorScript, "V3");
+const BatchingValidatorHash = resolveScriptHash(BatchingValidatorScript, "V3");
 
-const PoolBatchingValidatorAddr = serializePlutusScript(
-    { code: PoolBatchingValidatorScript, version: "V3" },
-).address;
+// const BatchingValidatorAddr = serializePlutusScript(
+//     { code: BatchingValidatorScript, version: "V3" },
+// ).address;
 
-console.log("PoolBatchingValidatorHash:", PoolBatchingValidatorHash);
+const BatchingRewardAddr = serializeRewardAddress(
+    BatchingValidatorHash,
+    true,
+    0
+);
+
+console.log("BatchingValidatorHash:", BatchingValidatorHash);
 
 // Order
 const OrderValidator = blueprint.validators.filter(v => 
@@ -50,7 +56,7 @@ const OrderValidator = blueprint.validators.filter(v =>
 
 const OrderValidatorScript = applyParamsToScript(
     OrderValidator[0].compiledCode,
-    [conStr1([builtinByteString(PoolBatchingValidatorHash)])],
+    [conStr1([builtinByteString(BatchingValidatorHash)])],
     "JSON"
 );
 
@@ -58,18 +64,34 @@ const OrderValidatorHash = resolveScriptHash(OrderValidatorScript, "V3");
 
 const OrderValidatorAddr = serializePlutusScript(
     { code: OrderValidatorScript, version: "V3" },
+    OrderValidatorHash,
+    0,
+    true,
 ).address;
 
+const OrderValidatorRewardAddr = serializeRewardAddress(
+    OrderValidatorHash,
+    true,
+    0
+);
+
 console.log("OrderValidatorHash:", OrderValidatorHash);
+
+
+// const poolUtxos = await blockchainProvider.fetchAddressUTxOs(PoolValidatorAddr);
+// console.log(poolUtxos[0].output.amount);
+// const orderUtxos = await blockchainProvider.fetchAddressUTxOs(OrderValidatorAddr);
+// console.log("orderUtxos:", orderUtxos);
 
 export {
     PoolValidatorScript,
     PoolValidatorHash,
     PoolValidatorAddr,
-    PoolBatchingValidatorScript,
-    PoolBatchingValidatorHash,
-    PoolBatchingValidatorAddr,
+    BatchingValidatorScript,
+    BatchingValidatorHash,
+    BatchingRewardAddr,
     OrderValidatorScript,
     OrderValidatorHash,
     OrderValidatorAddr,
+    OrderValidatorRewardAddr
 }

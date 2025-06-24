@@ -53,7 +53,7 @@ if (!wallet1Collateral) {
     throw new Error('No collateral utxo found');
 }
 
-const { pubKeyHash: wallet1VK } = deserializeAddress(wallet1Address);
+const { pubKeyHash: wallet1VK, stakeCredentialHash: wallet1SK } = deserializeAddress(wallet1Address);
 
 // Setup wallet2
 const wallet2Passphrase = process.env.WALLET_PASSPHRASE_TWO;
@@ -70,7 +70,7 @@ const wallet2 = new MeshWallet({
     },
 });
 const wallet2Address = await wallet1.getChangeAddress();
-const { pubKeyHash: wallet2VK } = deserializeAddress(wallet2Address);
+const { pubKeyHash: wallet2VK, stakeCredentialHash: wallet2SK } = deserializeAddress(wallet2Address);
 
 // Setup multisig
 const nativeScript: NativeScript = {
@@ -93,6 +93,7 @@ const multisigHash = resolveNativeScriptHash(nativeScript);
 // console.log("multisigHash:", multisigHash);
 const multiSigUtxos = await blockchainProvider.fetchAddressUTxOs(multiSigAddress);
 // console.log("multiSigUtxos:", multiSigUtxos);
+// console.log("multiSigUtxos:", multiSigUtxos[0].output.amount);
 
 // Evaluator for Aiken verbose mode
 const evaluator = new OfflineEvaluator(blockchainProvider, "preprod");
@@ -114,10 +115,19 @@ const alwaysSuccessValidatorMintScript = applyParamsToScript(
     "JSON",
 );
 const alwaysSuccessMintValidatorHash = resolveScriptHash(alwaysSuccessValidatorMintScript, "V3");
+console.log("alwaysSuccessMintValidatorHash:", alwaysSuccessMintValidatorHash);
+
+// Protocol Parameters UTxO
+const pParamsUtxo = (await blockchainProvider.fetchUTxOs("3e5c68b06a5ec885d3dce9d5f3859078c33bf87336f54f4cc0ec275ddb8678e0", 0))[0];
+// console.log("pParamsUtxo:", pParamsUtxo);
 
 // Constants
 const StPparamsAssetName = stringToHex("STP");
 const StStableAssetName = stringToHex("staterite");
+const StPoolNftName = stringToHex("SPN");
+
+const usdmName = stringToHex("usdm");
+const usdmUnit = alwaysSuccessMintValidatorHash + usdmName;
 
 export {
     blueprint,
@@ -128,16 +138,23 @@ export {
     wallet1,
     wallet1Address,
     wallet1VK,
+    wallet1SK,
     wallet1Utxos,
     wallet1Collateral,
     wallet2,
+    wallet2VK,
+    wallet2SK,
     multisigHash,
     multiSigAddress,
     multiSigCbor,
     multiSigUtxos,
     alwaysSuccessValidatorMintScript,
     alwaysSuccessMintValidatorHash,
+    pParamsUtxo,
+    usdmName,
+    usdmUnit,
     // Constants
     StPparamsAssetName,
     StStableAssetName,
+    StPoolNftName,
 }

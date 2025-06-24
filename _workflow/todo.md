@@ -7,5 +7,7 @@
 <!-- RECOMMENDED CHANGES -->
 - Confirm only one outputs and inputs of user balance and collateral utxos: Use list.filter and confirm only one element
 - Reset `meshTxBuilder` on both tx failure and success
+
 <!-- New -->
 - Create util functions to find deposit utxo outputs and inputs. Same for collateral utxo inputs and outputs
+- Add validation for pool assets during minting of pool NFT
