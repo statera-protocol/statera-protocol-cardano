@@ -1,5 +1,5 @@
 import { BuiltinByteString, ConStr0, deserializeDatum, Integer, List } from "@meshsdk/core";
-import { blockchainProvider } from "../setup.js";
+import { blockchainProvider } from "../../setup.js";
 import { scriptAddr } from "./validator.js";
 
 console.log('protocol paramters address', scriptAddr);

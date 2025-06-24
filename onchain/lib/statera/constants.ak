@@ -18,5 +18,5 @@ pub const st_liquidation_asset_name = #"53544c"
 // "SPN"
 pub const st_pool_nft_name = #"53504e"
 
-// staterites (sUSD subnuits (1_000_000 staterites == 1 sUSD))
-pub const st_stable_asset_name = #"73746174657269746573"
+// staterite (sUSD subnuits (1_000_000 staterites == 1 sUSD))
+pub const st_stable_asset_name = #"737461746572697465"

@@ -7,6 +7,21 @@ Halalend lending protocol mimics all the features of the currently existing lend
 Cardano except the interest paid by borrowers on loan repayment, and the fact that the protocol's
 own stable coin is going to use to issue loans. Loans are repaid at zero
 interest rate.
+It also provides a module for swap which involves the redemption of ST tokens with other Cardano stable tokens in a 1:1 ratio.
+
+
+
+
+
+
+# (Transactions Overview)
+## Set Protocol Parameters
+- This transaction requires an input from the multisig (admin) to make sure it signs the transaction,
+- `STP` NFT is minted using the `UnifiedControlValidator` as the minting policy. The NFT is sent together with a UTxO containing the `Protocol Parameters` in it's datum. The UTxO is sent to the `UnifiedControlValidator`
+
+
+
+
 
 
 ## 2. Architecture

@@ -4,13 +4,14 @@ import {
     MeshTxBuilder,
     MeshWallet,
     deserializeAddress,
+    resolveScriptHash,
     serializeNativeScript,
 } from "@meshsdk/core";
-import { NativeScript, UTxO } from "@meshsdk/common";
+import { NativeScript, stringToHex, UTxO } from "@meshsdk/common";
 import dotenv from "dotenv";
 dotenv.config();
 import blueprint from "../onchain/plutus.json" with { type: "json" };
-import { OfflineEvaluator, resolveNativeScriptHash } from "@meshsdk/core-csl";
+import { applyParamsToScript, OfflineEvaluator, resolveNativeScriptHash } from "@meshsdk/core-csl";
 
 // Setup blockhain provider as Maestro
 const maestroKey = process.env.MAESTRO_KEY;
@@ -86,10 +87,12 @@ const nativeScript: NativeScript = {
     ],
 };
 const { address: multiSigAddress, scriptCbor: multiSigCbor } = serializeNativeScript(nativeScript);
-console.log("nativeScript:", nativeScript);
-console.log("serializeNativeScript:", serializeNativeScript(nativeScript));
+// console.log("nativeScript:", nativeScript);
+// console.log("serializeNativeScript:", serializeNativeScript(nativeScript));
 const multisigHash = resolveNativeScriptHash(nativeScript);
-console.log("multisigHash:", multisigHash);
+// console.log("multisigHash:", multisigHash);
+const multiSigUtxos = await blockchainProvider.fetchAddressUTxOs(multiSigAddress);
+// console.log("multiSigUtxos:", multiSigUtxos);
 
 // Evaluator for Aiken verbose mode
 const evaluator = new OfflineEvaluator(blockchainProvider, "preprod");
@@ -101,6 +104,20 @@ const txBuilder = new MeshTxBuilder({
     verbose: false,
 });
 txBuilder.setNetwork('preprod');
+
+// test mint
+// Always success mint validator
+const alwaysSuccessMintValidator = "585401010029800aba2aba1aab9eaab9dab9a4888896600264653001300600198031803800cc0180092225980099b8748000c01cdd500144c9289bae30093008375400516401830060013003375400d149a26cac8009";
+const alwaysSuccessValidatorMintScript = applyParamsToScript(
+    alwaysSuccessMintValidator,
+    [],
+    "JSON",
+);
+const alwaysSuccessMintValidatorHash = resolveScriptHash(alwaysSuccessValidatorMintScript, "V3");
+
+// Constants
+const StPparamsAssetName = stringToHex("STP");
+const StStableAssetName = stringToHex("staterite");
 
 export {
     blueprint,
@@ -116,4 +133,11 @@ export {
     wallet2,
     multisigHash,
     multiSigAddress,
+    multiSigCbor,
+    multiSigUtxos,
+    alwaysSuccessValidatorMintScript,
+    alwaysSuccessMintValidatorHash,
+    // Constants
+    StPparamsAssetName,
+    StStableAssetName,
 }
