@@ -48,7 +48,8 @@ const wallet1 = new MeshWallet({
 const wallet1Address = await wallet1.getChangeAddress();
 
 const wallet1Utxos = await wallet1.getUtxos();
-const wallet1Collateral: UTxO = (await wallet1.getCollateral())[0]
+const wallet1Collateral: UTxO = (await blockchainProvider.fetchUTxOs("8b106e8eee2d7648a82e8e66d37b647685bdaf240e7e8028624a5e894e53c31f", 2))[0]
+// const wallet1Collateral: UTxO = (await wallet1.getCollateral())[0]
 if (!wallet1Collateral) {
     throw new Error('No collateral utxo found');
 }
@@ -101,7 +102,8 @@ const evaluator = new OfflineEvaluator(blockchainProvider, "preprod");
 const txBuilder = new MeshTxBuilder({
     fetcher: blockchainProvider,
     submitter: blockchainProvider,
-    evaluator: evaluator, // Can also be "evaluator: blockchainProvider,"
+    // evaluator: evaluator, // Can also be "evaluator: blockchainProvider,"
+    evaluator: blockchainProvider,
     verbose: false,
 });
 txBuilder.setNetwork('preprod');
@@ -118,7 +120,7 @@ const alwaysSuccessMintValidatorHash = resolveScriptHash(alwaysSuccessValidatorM
 console.log("alwaysSuccessMintValidatorHash:", alwaysSuccessMintValidatorHash);
 
 // Protocol Parameters UTxO
-const pParamsUtxo = (await blockchainProvider.fetchUTxOs("3e5c68b06a5ec885d3dce9d5f3859078c33bf87336f54f4cc0ec275ddb8678e0", 0))[0];
+const pParamsUtxo = (await blockchainProvider.fetchUTxOs("a5b6e555544c5a5d7b2eb02e5a456fb86ea5e9c87cc700a6659d5b23ea439496", 0))[0];
 // console.log("pParamsUtxo:", pParamsUtxo);
 
 // Constants
@@ -142,6 +144,7 @@ export {
     wallet1Utxos,
     wallet1Collateral,
     wallet2,
+    wallet2Address,
     wallet2VK,
     wallet2SK,
     multisigHash,

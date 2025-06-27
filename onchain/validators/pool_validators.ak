@@ -42,7 +42,7 @@ validator order_validator(pool_batching_cred: Credential) {
       ..
     } = order_input
 
-    pairs.has_key(tx.withdrawals, payment_credential)
+    pairs.has_key(tx.withdrawals, payment_credential)?
   }
 
   withdraw(redeemer: OrderRedeemer, account: Credential, tx: Transaction) {
@@ -70,8 +70,8 @@ validator order_validator(pool_batching_cred: Credential) {
             fn(output) {
               // order output must go to 'receiver address'
               and {
-                output.address == receiver_address,
-                output.value == order_input.output.value,
+                (output.address == receiver_address)?,
+                (output.value == order_input.output.value)?,
               }
             },
           )
@@ -79,7 +79,7 @@ validator order_validator(pool_batching_cred: Credential) {
         signed_by(extra_signatories, canceller)?
       }
 
-      ProcessOrder -> pairs.has_key(withdrawals, pool_batching_cred)
+      ProcessOrder -> pairs.has_key(withdrawals, pool_batching_cred)?
     }
   }
 
@@ -96,8 +96,8 @@ validator pool_validator(unified_control_validator_hash: ScriptHash) {
       mint |> assets.tokens(policy_id) |> dict.to_pairs
 
     let is_pool_nft_minting = and {
-        nft_name == st_pool_nft_name,
-        quantity == 1,
+        (nft_name == st_pool_nft_name)?,
+        (quantity == 1)?,
       }
 
     // only one pool output
@@ -116,7 +116,40 @@ validator pool_validator(unified_control_validator_hash: ScriptHash) {
       )
     expect InlineDatum(protocol_parameters) =
       protocol_parameters_ref.output.datum
-    expect ProtocolParametersDatum { admin, .. } = protocol_parameters
+    expect ProtocolParametersDatum { admin, swappable_assets, .. } =
+      protocol_parameters
+
+    // pool datum must be of the expected type PoolDatum
+    expect InlineDatum(pool_datum) = pool_output.datum
+    expect PoolDatum { .. } = pool_datum
+
+    // get the Value of the pool without ADA, and without the pool NFT
+    let pool_out_asset =
+      pool_output.value
+        |> without_lovelace
+        |> assets.add(policy_id, st_pool_nft_name, -1)
+    // get the policy ID of the pool out asset
+    expect [poa_policy] = assets.policies(pool_out_asset)
+    // only one pair of the pool asset must exist on the pool out utxo
+    expect [Pair(poa_name, _poa_quantity)] =
+      pool_out_asset |> assets.tokens(poa_policy) |> dict.to_pairs
+
+    // The pool asset should be a swappable asset
+    expect Some(_some_asset) =
+      list.find(
+        swappable_assets,
+        fn(swappable_asset) {
+          let AssetType {
+            policy_id: sa_policy_id,
+            asset_name: sa_asset_name,
+            ..
+          } = swappable_asset
+          and {
+            sa_policy_id == poa_policy,
+            sa_asset_name == poa_name,
+          }
+        },
+      )
 
     and {
       // pool NFT has to be minted
@@ -135,7 +168,7 @@ validator pool_validator(unified_control_validator_hash: ScriptHash) {
     tx: Transaction,
   ) {
     expect Some(PoolDatum { pool_batching_cred }) = datum
-    pairs.has_key(tx.withdrawals, pool_batching_cred)
+    pairs.has_key(tx.withdrawals, pool_batching_cred)?
   }
 
   else(_) {
@@ -246,7 +279,7 @@ validator pool_batching_validator(
 
     and {
       // an authorized batcher must sign the transaction
-      signed_by(extra_signatories, batcher),
+      signed_by(extra_signatories, batcher)?,
       // expected batched output must be equal to calculated batch ouput after processing orders
       trace @"ex": expected_batched_output
       trace @"po": process_orders(
@@ -256,13 +289,13 @@ validator pool_batching_validator(
         mint_st_validator_hash,
         outputs,
       )
-      expected_batched_output == process_orders(
+      (expected_batched_output == process_orders(
         order_inputs,
         batching_input,
         pool_asset,
         mint_st_validator_hash,
         outputs,
-      ),
+      ))?,
     }
   }
 
@@ -302,7 +335,12 @@ fn process_orders(
   if !list.is_empty(order_inputs) {
     expect [order_input, ..rest_order_inputs] = order_inputs
     expect InlineDatum(order_datum) = order_input.output.datum
-    expect OrderDatum { order_type, receiver_address, .. } = order_datum
+    expect OrderDatum {
+      order_type,
+      receiver_address,
+      pool_asset: order_pool_asset,
+      ..
+    } = order_datum
 
     let AssetType { policy_id: pool_asset_pid, asset_name: pool_asset_name, .. } =
       pool_asset
@@ -321,6 +359,9 @@ fn process_orders(
           (pool_asset_quantity, pool_asset_quantity)
         }
         Sell -> {
+          // pool asset in order datum must correspond to the pool asset batching
+          expect order_pool_asset == pool_asset
+
           let st_asset_quantity =
             quantity_of(
               order_input.output.value,
@@ -388,6 +429,12 @@ fn verify_order_output(
 }
 
 // Tests
+const usdm_asset =
+  AssetType {
+    is_stable: True,
+    policy_id: mock_policy_id(13),
+    asset_name: "usdm",
+  }
 
 fn create_order_input(o_value: Value, o_datum: OrderDatum, ur_num: Int) {
   let order_script_hash = mock_script_hash(0)
@@ -512,6 +559,7 @@ test test_process_buy_order() {
         order_type: Buy,
         receiver_address: receiver_address_1,
         canceller: mock_pub_key_hash(3),
+        pool_asset: usdm_asset,
       },
       1,
     )
@@ -548,6 +596,7 @@ test test_process_sell_order() {
         order_type: Sell,
         receiver_address: receiver_address_1,
         canceller: mock_pub_key_hash(3),
+        pool_asset: usdm_asset,
       },
       1,
     )
@@ -585,6 +634,7 @@ test test_process_several_buy_orders() {
         order_type: Buy,
         receiver_address: receiver_address_1,
         canceller: mock_pub_key_hash(3),
+        pool_asset: usdm_asset,
       },
       1,
     )
@@ -609,6 +659,7 @@ test test_process_several_buy_orders() {
         order_type: Buy,
         receiver_address: receiver_address_2,
         canceller: mock_pub_key_hash(3),
+        pool_asset: usdm_asset,
       },
       1,
     )
@@ -633,6 +684,7 @@ test test_process_several_buy_orders() {
         order_type: Buy,
         receiver_address: receiver_address_3,
         canceller: mock_pub_key_hash(3),
+        pool_asset: usdm_asset,
       },
       1,
     )
@@ -670,6 +722,7 @@ test test_process_several_sell_orders() {
         order_type: Sell,
         receiver_address: receiver_address_1,
         canceller: mock_pub_key_hash(3),
+        pool_asset: usdm_asset,
       },
       1,
     )
@@ -694,6 +747,7 @@ test test_process_several_sell_orders() {
         order_type: Sell,
         receiver_address: receiver_address_2,
         canceller: mock_pub_key_hash(3),
+        pool_asset: usdm_asset,
       },
       1,
     )
@@ -718,6 +772,7 @@ test test_process_several_sell_orders() {
         order_type: Sell,
         receiver_address: receiver_address_3,
         canceller: mock_pub_key_hash(3),
+        pool_asset: usdm_asset,
       },
       1,
     )
@@ -755,6 +810,7 @@ test test_process_both_buy_and_sell_orders() {
         order_type: Sell,
         receiver_address: receiver_address_1,
         canceller: mock_pub_key_hash(3),
+        pool_asset: usdm_asset,
       },
       1,
     )
@@ -779,6 +835,7 @@ test test_process_both_buy_and_sell_orders() {
         order_type: Sell,
         receiver_address: receiver_address_2,
         canceller: mock_pub_key_hash(3),
+        pool_asset: usdm_asset,
       },
       1,
     )
@@ -803,6 +860,7 @@ test test_process_both_buy_and_sell_orders() {
         order_type: Buy,
         receiver_address: receiver_address_3,
         canceller: mock_pub_key_hash(3),
+        pool_asset: usdm_asset,
       },
       1,
     )
@@ -827,6 +885,7 @@ test test_process_both_buy_and_sell_orders() {
         order_type: Buy,
         receiver_address: receiver_address_4,
         canceller: mock_pub_key_hash(3),
+        pool_asset: usdm_asset,
       },
       1,
     )
@@ -907,7 +966,13 @@ test test_cancel_order() {
   let canceller = mock_pub_key_hash(3)
   let order_script_hash = mock_script_hash(0)
 
-  let order_datum = OrderDatum { order_type: Sell, receiver_address, canceller }
+  let order_datum =
+    OrderDatum {
+      order_type: Sell,
+      receiver_address,
+      canceller,
+      pool_asset: usdm_asset,
+    }
 
   let order_input =
     create_order_input(

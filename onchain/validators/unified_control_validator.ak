@@ -114,13 +114,13 @@ fn validate_remove_control_spend(
     )
 
   and {
-    list.length(control_outputs) == 0,
-    is_multisig_signing(inputs, admin_sc),
+    (list.length(control_outputs) == 0)?,
+    is_multisig_signing(inputs, admin_sc)?,
   }
 }
 
 fn validate_remove_control_mint(inputs: List<Input>, admin_sc: ScriptHash) {
-  is_multisig_signing(inputs, admin_sc)
+  is_multisig_signing(inputs, admin_sc)?
 }
 
 fn validate_update_control(
@@ -176,9 +176,9 @@ fn validate_update_control_in_out(
   admin_sc: ScriptHash,
 ) {
   and {
-    validate_control_input(own_input, own_hash, which_datum, the_asset_name),
-    validate_control_output(outputs, own_hash, which_datum, the_asset_name),
-    is_multisig_signing(inputs, admin_sc),
+    validate_control_input(own_input, own_hash, which_datum, the_asset_name)?,
+    validate_control_output(outputs, own_hash, which_datum, the_asset_name)?,
+    is_multisig_signing(inputs, admin_sc)?,
   }
 }
 
@@ -205,13 +205,13 @@ fn validate_control_input(
 
   and {
     // Must be a UTxO from own hash
-    input.output.address.payment_credential == Script(own_hash),
+    (input.output.address.payment_credential == Script(own_hash))?,
     // Must only contain "STO" or "STP" or "STL" token apart from ADA
-    assets.without_lovelace(input.output.value) == from_asset(
+    (assets.without_lovelace(input.output.value) == from_asset(
       own_hash,
       the_asset_name,
       1,
-    ),
+    ))?,
   }
 }
 
@@ -225,23 +225,8 @@ fn validate_control_output(
     list.filter(
       outputs,
       fn(output) {
-        expect InlineDatum(output_datum) = output.datum
-        // Datum must of type "OracleDatum" or "ProtocolParametersDatum" or "LiqFundsDatum"
-        when which_datum is {
-          "oracle_datum" -> {
-            expect OracleDatum { .. } = output_datum
-            True
-          }
-          "protocol_parameters_datum" -> {
-            expect ProtocolParametersDatum { .. } = output_datum
-            True
-          }
-          "liq_funds_datum" -> {
-            expect LiqFundsDatum { .. } = output_datum
-            True
-          }
-          _ -> False
-        }
+        // Must be a UTxO going to own hash
+        (output.address.payment_credential == Script(own_hash))?
       },
     )
   // Only one output
@@ -249,15 +234,34 @@ fn validate_control_output(
 
   expect Some(control_output) = list.at(control_outputs, 0)
 
+  expect InlineDatum(output_datum) = control_output.datum
+  // Datum must of type "OracleDatum" or "ProtocolParametersDatum" or "LiqFundsDatum"
+  let is_out_datum_valid =
+    when which_datum is {
+      "oracle_datum" -> {
+        expect OracleDatum { .. } = output_datum
+        True
+      }
+      "protocol_parameters_datum" -> {
+        expect ProtocolParametersDatum { .. } = output_datum
+        True
+      }
+      "liq_funds_datum" -> {
+        expect LiqFundsDatum { .. } = output_datum
+        True
+      }
+      _ -> False
+    }
+
   and {
-    // Must be a UTxO going to own hash
-    control_output.address.payment_credential == Script(own_hash),
+    // output datum should be of the correct type
+    is_out_datum_valid?,
     // Must only contain "STO" or "STP" or "STL" token apart from ADA
-    assets.without_lovelace(control_output.value) == from_asset(
+    (assets.without_lovelace(control_output.value) == from_asset(
       own_hash,
       the_asset_name,
       1,
-    ),
+    ))?,
   }
 }
 
@@ -322,38 +326,46 @@ fn validate_init_control_out(
     list.find(
       outputs,
       fn(output) {
-        expect InlineDatum(output_datum) = output.datum
-        // Datum must of type "OracleDatum" or "ProtocolParametersDatum" or "LiqFundsDatum"
-        when which_datum is {
-          "oracle_datum" -> {
-            expect OracleDatum { .. } = output_datum
-          }
-          "protocol_parameters_datum" -> {
-            expect ProtocolParametersDatum { admin, .. } = output_datum
-            expect admin == admin_sc
-          }
-          "liq_funds_datum" -> {
-            expect LiqFundsDatum { .. } = output_datum
-          }
-          _ -> fail
-        }
         // Must be a UTxO going to own hash
         output.address.payment_credential == Script(policy_id)
       },
     )
 
+  expect InlineDatum(output_datum) = the_output.datum
+
+  // Datum must of type "OracleDatum" or "ProtocolParametersDatum" or "LiqFundsDatum"
+  let is_out_datum_valid =
+    when which_datum is {
+      "oracle_datum" -> {
+        expect OracleDatum { .. } = output_datum
+        True
+      }
+      "protocol_parameters_datum" -> {
+        expect ProtocolParametersDatum { admin, .. } = output_datum
+        expect admin == admin_sc
+        True
+      }
+      "liq_funds_datum" -> {
+        expect LiqFundsDatum { .. } = output_datum
+        True
+      }
+      _ -> False
+    }
+
   and {
+    // output datum should be of the correct type
+    is_out_datum_valid?,
     // Must only contain "STO" or "STP" or "STL" token apart from ADA
-    assets.without_lovelace(the_output.value) == from_asset(
+    (assets.without_lovelace(the_output.value) == from_asset(
       policy_id,
       the_asset_name,
       1,
-    ),
+    ))?,
     // Must mint only 1 quantity of "the_asset_name" token
-    name == the_asset_name,
-    quantity == 1,
+    (name == the_asset_name)?,
+    (quantity == 1)?,
     // admin must sign the transaction
-    is_multisig_signing(inputs, admin_sc),
+    is_multisig_signing(inputs, admin_sc)?,
   }
 }
 

@@ -2,7 +2,7 @@ import { alwaysSuccessMintValidatorHash, alwaysSuccessValidatorMintScript, txBui
 
 const unsignedTx = await txBuilder
     .mintPlutusScriptV3()
-    .mint("1000000000", alwaysSuccessMintValidatorHash, usdmName)
+    .mint("10000000000", alwaysSuccessMintValidatorHash, usdmName)
     .mintingScript(alwaysSuccessValidatorMintScript)
     .mintRedeemerValue("")
     .txInCollateral(

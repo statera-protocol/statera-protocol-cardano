@@ -47,4 +47,5 @@ pub type OrderDatum {
   order_type: OrderType,
   receiver_address: Address,
   canceller: VerificationKeyHash,
+  pool_asset: AssetType,
 }

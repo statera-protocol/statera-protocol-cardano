@@ -32,7 +32,7 @@ validator mint_st_validator(
           policy_id,
           redeemer,
         )
-      Swap -> pairs.has_key(withdrawals, pool_batching_cred)
+      Swap -> pairs.has_key(withdrawals, pool_batching_cred)?
     }
   }
 

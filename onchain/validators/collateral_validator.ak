@@ -169,20 +169,20 @@ fn handle_collateral(
           collateral_rate_at_lending_precised,
           reference_inputs,
           collateral_asset,
-        ),
+        )?,
         liquidated_funds_must_go_to_collector(
           reference_inputs,
           outputs,
           own_input,
           unified_control_validator_hash,
-        ),
+        )?,
       }
 
     IncreaseCollateral ->
-      handle_increase_collateral(inputs, outputs, own_input, datum)
+      handle_increase_collateral(inputs, outputs, own_input, datum)?
 
     PartialRepayment ->
-      handle_partial_repayment(inputs, outputs, own_input, datum, mint)
+      handle_partial_repayment(inputs, outputs, own_input, datum, mint)?
 
     _ -> False
   }
@@ -408,13 +408,13 @@ fn handle_increase_collateral(
     collateral_asset_amount + collateral_increase_amount
 
   and {
-    st_policy_id == output_st_policy_id,
-    st_asset_name == output_st_asset_name,
-    st_borrowed == output_st_borrowed,
-    loan_nft_pid == output_loan_nft_pid,
-    loan_nft_asset_name == output_loan_nft_asset_name,
-    collateral_rate_at_lending_precised == output_collateral_rate_at_lending_precised,
-    collateral_asset == output_collateral_asset,
+    (st_policy_id == output_st_policy_id)?,
+    (st_asset_name == output_st_asset_name)?,
+    (st_borrowed == output_st_borrowed)?,
+    (loan_nft_pid == output_loan_nft_pid)?,
+    (loan_nft_asset_name == output_loan_nft_asset_name)?,
+    (collateral_rate_at_lending_precised == output_collateral_rate_at_lending_precised)?,
+    (collateral_asset == output_collateral_asset)?,
     // make sure the collateral is increased with the right amount
     (output_collateral_asset_amount == expected_new_collateral_balance)?,
     // make sure collateral value is not tampered with
@@ -617,19 +617,19 @@ fn handle_partial_repayment(
   let remaining_unpaid_loan = st_borrowed - -1 * loan_token_burn_quantity
 
   and {
-    st_policy_id == output_st_policy_id,
-    st_asset_name == output_st_asset_name,
+    (st_policy_id == output_st_policy_id)?,
+    (st_asset_name == output_st_asset_name)?,
     // output loan borrowed in datum should be updated
-    output_st_borrowed == remaining_unpaid_loan,
-    loan_nft_pid == output_loan_nft_pid,
-    loan_nft_asset_name == output_loan_nft_asset_name,
-    collateral_rate_at_lending_precised == output_collateral_rate_at_lending_precised,
-    collateral_asset == output_collateral_asset,
-    collateral_asset_amount == output_collateral_asset_amount,
+    (output_st_borrowed == remaining_unpaid_loan)?,
+    (loan_nft_pid == output_loan_nft_pid)?,
+    (loan_nft_asset_name == output_loan_nft_asset_name)?,
+    (collateral_rate_at_lending_precised == output_collateral_rate_at_lending_precised)?,
+    (collateral_asset == output_collateral_asset)?,
+    (collateral_asset_amount == output_collateral_asset_amount)?,
     // loan token is really the loan token
-    st_asset_name == loan_token_name,
+    (st_asset_name == loan_token_name)?,
     // make sure collateral value is not tampered with
-    own_input.output.value == collateral_output.value,
+    (own_input.output.value == collateral_output.value)?,
   }
 }
 

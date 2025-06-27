@@ -1,18 +1,28 @@
-import { mConStr0, mPubKeyAddress } from "@meshsdk/core";
-import { txBuilder, usdmUnit, wallet1, wallet1Address, wallet1SK, wallet1Utxos, wallet1VK } from "../setup.js";
+import { mConStr0, mConStr1, mPubKeyAddress, stringToHex } from "@meshsdk/core";
+import { alwaysSuccessMintValidatorHash, StStableAssetName, txBuilder, usdmUnit, wallet1, wallet1Address, wallet1SK, wallet1Utxos, wallet1VK, wallet2SK, wallet2VK } from "../setup.js";
 import { OrderValidatorAddr } from "./validators.js";
+import { MintStValidatorHash } from "../StMinting/validator.js";
 
 const mAddr1 = mPubKeyAddress(wallet1VK, wallet1SK);
-const mAddr2 = mPubKeyAddress(wallet1VK, wallet1SK);
+const mAddr2 = mPubKeyAddress(wallet2VK, wallet2SK);
+
+const stUnit = MintStValidatorHash + StStableAssetName;
 
 const OrderDatum = mConStr0([
-    mConStr0([]),
+    mConStr0([]), // Buy
+    // mConStr1([]), // Sell
     mAddr1,
     wallet1VK,
+    mConStr0([
+        mConStr1([]),
+        alwaysSuccessMintValidatorHash,
+        stringToHex("usdm"),
+    ]),
 ]);
 
 const unsignedTx = await txBuilder
-    .txOut(OrderValidatorAddr, [{ unit: usdmUnit, quantity: "10000000" }])
+    .txOut(OrderValidatorAddr, [{ unit: usdmUnit, quantity: "15000000" }]) // Buy
+    // .txOut(OrderValidatorAddr, [{ unit: stUnit, quantity: "7000000" }]) // Sell
     .txOutInlineDatumValue(OrderDatum)
     .changeAddress(wallet1Address)
     .selectUtxosFrom(wallet1Utxos)

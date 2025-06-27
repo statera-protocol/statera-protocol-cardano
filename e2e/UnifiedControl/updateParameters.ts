@@ -1,5 +1,5 @@
 import { mConStr0, mConStr1, stringToHex } from "@meshsdk/core";
-import { alwaysSuccessMintValidatorHash, multiSigAddress, multiSigCbor, multisigHash, multiSigUtxos, StPparamsAssetName, StStableAssetName, txBuilder, wallet1, wallet1Address, wallet1Collateral, wallet1Utxos, wallet1VK, wallet2 } from "../setup.js";
+import { alwaysSuccessMintValidatorHash, multiSigAddress, multiSigCbor, multisigHash, multiSigUtxos, pParamsUtxo, StPparamsAssetName, StStableAssetName, txBuilder, wallet1, wallet1Address, wallet1Collateral, wallet1Utxos, wallet1VK, wallet2 } from "../setup.js";
 import { UnifiedControlValidatorAddr, UnifiedControlValidatorHash, UnifiedControlValidatorScript } from "./validator.js";
 import { MintStValidatorHash } from "../StMinting/validator.js";
 
@@ -52,6 +52,16 @@ if (!multiSigCbor) {
 }
 
 const unsignedTx = await txBuilder
+    .spendingPlutusScriptV3()
+    .txIn(
+        pParamsUtxo.input.txHash,
+        pParamsUtxo.input.outputIndex,
+        pParamsUtxo.output.amount,
+        pParamsUtxo.output.address,
+    )
+    .txInScript(UnifiedControlValidatorScript)
+    .spendingReferenceTxInInlineDatumPresent()
+    .spendingReferenceTxInRedeemerValue(mConStr1([]))
     .txIn(
         multiSigUtxos[0].input.txHash,
         multiSigUtxos[0].input.outputIndex,
@@ -59,10 +69,6 @@ const unsignedTx = await txBuilder
         multiSigUtxos[0].output.address,
     )
     .txInScript(multiSigCbor)
-    .mintPlutusScriptV3()
-    .mint("1", UnifiedControlValidatorHash, StPparamsAssetName)
-    .mintingScript(UnifiedControlValidatorScript)
-    .mintRedeemerValue(mConStr1([]))
     .txOut(UnifiedControlValidatorAddr, [{ unit: UnifiedControlValidatorHash + StPparamsAssetName, quantity: "1" }])
     .txOutInlineDatumValue(ProtocolParametersDatum)
     .txInCollateral(
@@ -71,7 +77,7 @@ const unsignedTx = await txBuilder
         wallet1Collateral.output.amount,
         wallet1Collateral.output.address,
     )
-    .changeAddress(multiSigAddress)
+    .changeAddress(wallet1Address)
     .selectUtxosFrom(wallet1Utxos)
     .setFee("1180441")
     .complete()

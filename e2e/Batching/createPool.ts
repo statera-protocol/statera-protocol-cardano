@@ -1,5 +1,5 @@
 import { mConStr0, mConStr1 } from "@meshsdk/core";
-import { multiSigAddress, multiSigCbor, multiSigUtxos, pParamsUtxo, StPoolNftName, txBuilder, usdmUnit, wallet1, wallet1Collateral, wallet1Utxos, wallet2 } from "../setup.js";
+import { multiSigAddress, multiSigCbor, multiSigUtxos, pParamsUtxo, StPoolNftName, txBuilder, usdmUnit, wallet1, wallet1Address, wallet1Collateral, wallet1Utxos, wallet2 } from "../setup.js";
 import { BatchingValidatorHash, PoolValidatorAddr, PoolValidatorHash, PoolValidatorScript } from "./validators.js";
 
 const PoolDatum = mConStr0([
@@ -36,7 +36,7 @@ const unsignedTx = await txBuilder
         wallet1Collateral.output.amount,
         wallet1Collateral.output.address,
     )
-    .changeAddress(multiSigAddress)
+    .changeAddress(wallet1Address)
     .selectUtxosFrom(wallet1Utxos)
     .setFee("1130441")
     .complete()
