@@ -1,0 +1,42 @@
+import { mConStr2 } from "@meshsdk/core";
+import { multiSigAddress, multiSigCbor, multisigHash, multiSigUtxos, StLiquidationAssetName, txBuilder, wallet1, wallet1Address, wallet1Collateral, wallet1Utxos, wallet2 } from "../setup.js";
+import { UnifiedControlValidatorAddr, UnifiedControlValidatorHash, UnifiedControlValidatorScript } from "./validator.js";
+
+const LiqAddrDatum = mConStr2([multisigHash]);
+
+if (!multiSigCbor) {
+    throw new Error("multisig cbor doesn't exist");
+}
+
+const unsignedTx = await txBuilder
+    .txIn(
+        multiSigUtxos[0].input.txHash,
+        multiSigUtxos[0].input.outputIndex,
+        multiSigUtxos[0].output.amount,
+        multiSigUtxos[0].output.address,
+    )
+    .txInScript(multiSigCbor)
+    .mintPlutusScriptV3()
+    .mint("1", UnifiedControlValidatorHash, StLiquidationAssetName)
+    .mintingScript(UnifiedControlValidatorScript)
+    .mintRedeemerValue(mConStr2([]))
+    .txOut(UnifiedControlValidatorAddr, [{ unit: UnifiedControlValidatorHash + StLiquidationAssetName, quantity: "1" }])
+    .txOutInlineDatumValue(LiqAddrDatum)
+    // send back some UTxO to multisig
+    .txOut(multiSigAddress, [{ unit: "lovelace", quantity: "20000000" }])
+    .txInCollateral(
+        wallet1Collateral.input.txHash,
+        wallet1Collateral.input.outputIndex,
+        wallet1Collateral.output.amount,
+        wallet1Collateral.output.address,
+    )
+    .changeAddress(wallet1Address)
+    .selectUtxosFrom(wallet1Utxos)
+    .setFee("480441")
+    .complete()
+
+const signedTx1 = await wallet1.signTx(unsignedTx, true);
+const signedTx2 = await wallet2.signTx(signedTx1, true);
+
+const txHash = await wallet1.submitTx(signedTx2);
+console.log("Create liquidation address tx hash:", txHash);

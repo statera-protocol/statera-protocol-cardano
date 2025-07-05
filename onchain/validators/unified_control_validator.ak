@@ -444,6 +444,7 @@ test test_init_protocol_params() {
       value: assets.merge(from_lovelace(2000000), stp),
       datum: InlineDatum(
         ProtocolParametersDatum {
+          loan_to_value_ratio: 80,
           min_collateral_ratio: 150,
           min_liquidation_threshold: 120,
           min_loan_amount: 10,
@@ -607,6 +608,7 @@ test test_update_protocol_params() {
 
   let pparams_input_datum =
     ProtocolParametersDatum {
+      loan_to_value_ratio: 80,
       min_collateral_ratio: 150,
       min_liquidation_threshold: 120,
       min_loan_amount: 10,
@@ -663,6 +665,7 @@ test test_update_protocol_params() {
       value: assets.merge(from_lovelace(2000000), stp),
       datum: InlineDatum(
         ProtocolParametersDatum {
+          loan_to_value_ratio: 80,
           min_collateral_ratio: 150,
           min_liquidation_threshold: 120,
           min_loan_amount: 10,

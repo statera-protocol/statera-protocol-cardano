@@ -1,7 +1,6 @@
-Set Protocol Parameters tx hash: a5b6e555544c5a5d7b2eb02e5a456fb86ea5e9c87cc700a6659d5b23ea439496
-Create pool: d030626d93c4e14510e67636b281db9eef7f00509fb97ac1e85cdf234d74e688
+POOL BATCHING MODULE:
 
-register all stake certificate tx hash: 95cdb64241385c28357248c9744d993250b0b21ff7d8b62ec488e0db4fd520b6
+Create pool: d030626d93c4e14510e67636b281db9eef7f00509fb97ac1e85cdf234d74e688
 
 Create order: 765d716194ddb5f6e2250351a151747b4d616642e367db91bd00cd682313b66b
 Pool batching: 8b106e8eee2d7648a82e8e66d37b647685bdaf240e7e8028624a5e894e53c31f
@@ -11,3 +10,25 @@ Create order (2) Sell: 6a440d03d7fcfc201b12f86fb012358ca10f8cdb6e10aeb6e351c10ce
 Create order (3) Buy: 39d56b6fe0fc878846396045c7823033752e9a63b2185dfdd4485cf8d1745658
 Pool batching: c038289ac33921bafe948140fd99d2004dacfa8eca97fd0f0d481602801620d8
 
+
+BALANCE MODULE:
+
+Add balance txHash: 1f94b93b948a9e48c8b43fcc0859993a7bee34579f5a66be6b2daef235cbefb4
+Increase balance txHash: 4e778ace9f5cde9a7cb53ca62967027124027ab363bfa92c504f3e0269f612c6
+reduce balance txHash: 5624567affec65f0c06910eaa5c32f2d97f091df39cb1231528bd2a9de5416d5
+withdraw balance txHash: 1baf142c4ccffbc88026d5699afa9ab2334cbd3c5674e62b547af9b706e20109
+
+
+LOAN MODULE:
+
+take loan txHash: 5fcc86f59fb598a5aae60200b9a4e7aa4e9fb435f211408b9212be8f50401355
+Increase collateral txHash: ef4879c026ab3999c86cf9d467f12903bbcbe903ddea751f7bb8e3cf82698aba
+.....................
+(used in loan module)
+Add balance txHash: 4d3ac9857149afc3f51d560462ea3cde83652c3c03480f6405dd8c8682c89d90
+
+
+ADMIN MODULE:
+
+Create parameters tx hash: 62e9dfbafa714614dd679b9f0a3fd4286b4635d62c19240867c396faa1ee3b6b
+Create oracle tx hash: 0211f4301faac228edd7a0b3d17f502d69f177fa3c8537a839bc0bc1bb5348f9

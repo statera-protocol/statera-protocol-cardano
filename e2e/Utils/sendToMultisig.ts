@@ -2,7 +2,7 @@ import { multiSigAddress, txBuilder, wallet1, wallet1Address, wallet1Utxos } fro
 
 
 const unsignedTx = await txBuilder
-    .txOut(multiSigAddress, [{ unit: "lovelace", quantity: "150000000" }])
+    .txOut(multiSigAddress, [{ unit: "lovelace", quantity: "20000000" }])
     .changeAddress(wallet1Address)
     .selectUtxosFrom(wallet1Utxos)
     .complete()

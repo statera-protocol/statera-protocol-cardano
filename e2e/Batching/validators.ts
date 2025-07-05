@@ -1,5 +1,5 @@
 import { applyParamsToScript, builtinByteString, conStr1, resolveScriptHash, serializePlutusScript, serializeRewardAddress } from "@meshsdk/core";
-import { blockchainProvider, blueprint, wallet1VK } from "../setup.js";
+import { assetObject, blockchainProvider, blueprint, wallet1VK } from "../setup.js";
 import { UnifiedControlValidatorHash } from "../UnifiedControl/validator.js";
 
 // Pool
@@ -77,6 +77,8 @@ const OrderValidatorRewardAddr = serializeRewardAddress(
 
 console.log("OrderValidatorHash:", OrderValidatorHash);
 
+const batchingAsset = assetObject.USDM;
+
 
 // const poolUtxos = await blockchainProvider.fetchAddressUTxOs(PoolValidatorAddr);
 // console.log(poolUtxos[0].output.amount);
@@ -93,5 +95,6 @@ export {
     OrderValidatorScript,
     OrderValidatorHash,
     OrderValidatorAddr,
-    OrderValidatorRewardAddr
+    OrderValidatorRewardAddr,
+    batchingAsset,
 }

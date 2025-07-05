@@ -26,6 +26,7 @@ pub fn get_protocol_parameters_ref() {
         ),
         datum: InlineDatum(
           ProtocolParametersDatum {
+            loan_to_value_ratio: 80,
             min_collateral_ratio: 150,
             min_liquidation_threshold: 120,
             min_loan_amount: 10,

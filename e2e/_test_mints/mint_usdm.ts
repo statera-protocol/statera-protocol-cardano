@@ -1,8 +1,9 @@
-import { alwaysSuccessMintValidatorHash, alwaysSuccessValidatorMintScript, txBuilder, usdmName, wallet1, wallet1Address, wallet1Collateral, wallet1Utxos } from "../setup.js";
+import { batchingAsset } from "../Batching/validators.js";
+import { alwaysSuccessValidatorMintScript, txBuilder, wallet1, wallet1Address, wallet1Collateral, wallet1Utxos } from "../setup.js";
 
 const unsignedTx = await txBuilder
     .mintPlutusScriptV3()
-    .mint("10000000000", alwaysSuccessMintValidatorHash, usdmName)
+    .mint("10000000000", batchingAsset.policy, batchingAsset.name)
     .mintingScript(alwaysSuccessValidatorMintScript)
     .mintRedeemerValue("")
     .txInCollateral(

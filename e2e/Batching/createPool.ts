@@ -1,12 +1,13 @@
 import { mConStr0, mConStr1 } from "@meshsdk/core";
-import { multiSigAddress, multiSigCbor, multiSigUtxos, pParamsUtxo, StPoolNftName, txBuilder, usdmUnit, wallet1, wallet1Address, wallet1Collateral, wallet1Utxos, wallet2 } from "../setup.js";
-import { BatchingValidatorHash, PoolValidatorAddr, PoolValidatorHash, PoolValidatorScript } from "./validators.js";
+import { multiSigAddress, multiSigCbor, multiSigUtxos, StPoolNftName, txBuilder, wallet1, wallet1Address, wallet1Collateral, wallet1Utxos, wallet2 } from "../setup.js";
+import { batchingAsset, BatchingValidatorHash, PoolValidatorAddr, PoolValidatorHash, PoolValidatorScript } from "./validators.js";
+import { pParamsUtxo } from "../utils.js";
 
 const PoolDatum = mConStr0([
     mConStr1([BatchingValidatorHash])
 ]);
 
-const poolAssetUnit = usdmUnit;
+const poolAssetUnit = batchingAsset.unit;
 
 if (!multiSigCbor) {
     throw new Error("multisig cbor doesn't exist");
@@ -28,6 +29,8 @@ const unsignedTx = await txBuilder
         { unit: poolAssetUnit, quantity: "1000000000" },
         { unit: PoolValidatorHash + StPoolNftName, quantity: "1" }
     ])
+    // send back some UTxO to multisig
+    .txOut(multiSigAddress, [{ unit: "lovelace", quantity: "20000000" }])
     .txOutInlineDatumValue(PoolDatum)
     .readOnlyTxInReference(pParamsUtxo.input.txHash, pParamsUtxo.input.outputIndex)
     .txInCollateral(

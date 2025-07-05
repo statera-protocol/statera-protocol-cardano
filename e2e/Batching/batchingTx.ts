@@ -1,10 +1,11 @@
 import { ConStr0, deserializeDatum, mConStr0, mConStr1, mConStr3, stringToHex } from "@meshsdk/core";
-import { alwaysSuccessMintValidatorHash, blockchainProvider, pParamsUtxo, StPoolNftName, StStableAssetName, txBuilder, usdmUnit, wallet1, wallet1Address, wallet1Collateral, wallet1Utxos, wallet1VK, wallet2Address } from "../setup.js";
-import { MintStValidatorHash, MintStValidatorScript } from "../StMinting/validator.js";
-import { BatchingRewardAddr, BatchingValidatorHash, BatchingValidatorScript, OrderValidatorAddr, OrderValidatorHash, OrderValidatorRewardAddr, OrderValidatorScript, PoolValidatorAddr, PoolValidatorHash, PoolValidatorScript } from "./validators.js";
+import { blockchainProvider, StPoolNftName, StStableAssetName, txBuilder, wallet1, wallet1Address, wallet1Collateral, wallet1Utxos, wallet1VK, wallet2Address } from "../setup.js";
+import { MintStPolicy, MintStValidatorScript, stUnit } from "../StMinting/validator.js";
+import { batchingAsset, BatchingRewardAddr, BatchingValidatorHash, BatchingValidatorScript, OrderValidatorAddr, OrderValidatorHash, OrderValidatorRewardAddr, OrderValidatorScript, PoolValidatorAddr, PoolValidatorHash, PoolValidatorScript } from "./validators.js";
 import { OrderDatumType } from "../types.js";
+import { pParamsUtxo } from "../utils.js";
 
-const poolAssetUnit = usdmUnit;
+const poolAssetUnit = batchingAsset.unit;
 
 const AllOrderUtxos = await blockchainProvider.fetchAddressUTxOs(OrderValidatorAddr);
 // Only orders with the pool asset and with a valid datum are batched
@@ -50,8 +51,8 @@ const PoolBatchingRedeemer = mConStr0([
     0,
     mConStr0([
         mConStr1([]),
-        alwaysSuccessMintValidatorHash,
-        stringToHex("usdm"),
+        batchingAsset.policy,
+        batchingAsset.name,
     ]),
 ]);
 
@@ -73,7 +74,7 @@ const PoolBatchingRedeemer = mConStr0([
 const unsignedTx = await txBuilder
     // mint st tokens
     .mintPlutusScriptV3()
-    .mint(String(stMinted), MintStValidatorHash, StStableAssetName)
+    .mint(String(stMinted), MintStPolicy, StStableAssetName)
     .mintingScript(MintStValidatorScript)
     .mintRedeemerValue(mConStr3([]))
     // order spend 0
@@ -139,17 +140,17 @@ const unsignedTx = await txBuilder
     // order output 0
     .txOut(wallet1Address, [
         batchingOrderUtxos[0].output.amount[0], poolUtxo.output.amount[0],
-        { unit: MintStValidatorHash + StStableAssetName, quantity: String(10000000) }
+        { unit: stUnit, quantity: String(10000000) }
     ])
     // order output 1
     .txOut(wallet1Address, [
         batchingOrderUtxos[1].output.amount[0], poolUtxo.output.amount[0],
-        { unit: usdmUnit, quantity: String(7000000) }
+        { unit: poolAssetUnit, quantity: String(7000000) }
     ])
     // order output 2
     .txOut(wallet1Address, [
         batchingOrderUtxos[2].output.amount[0], poolUtxo.output.amount[0],
-        { unit: MintStValidatorHash + StStableAssetName, quantity: String(15000000) }
+        { unit: stUnit, quantity: String(15000000) }
     ])
     // protocol parameters reference input
     .readOnlyTxInReference(pParamsUtxo.input.txHash, pParamsUtxo.input.outputIndex)

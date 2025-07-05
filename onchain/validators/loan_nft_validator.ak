@@ -238,7 +238,7 @@ fn validate_protocol_parameters(
     protocol_parameters_ref.output.datum
 
   expect ProtocolParametersDatum {
-    min_collateral_ratio,
+    loan_to_value_ratio,
     min_loan_amount,
     collateral_assets,
     ..
@@ -247,41 +247,29 @@ fn validate_protocol_parameters(
   // Make sure collateral asset is allowed
   expect list.has(collateral_assets, collateral_asset)
 
-  // trace @"after destructuring protocol parameters"
-  // Validating MCR - get the 100% value of the amount of collateral asset
-  let hundred_percent_col_asset_value =
-    calculate_by_percentage(
-      collateral_asset_amount * precision_factor,
-      min_collateral_ratio,
-      100,
-    )
-
   // trace @"before is_col_amount_and_rate_valid"
   let is_col_amount_and_rate_valid = {
-    trace @"inside is_col_amount_and_rate_valid else.."
-    let (expected_col_asset_amount, oracle_asset_st_rate) =
-      get_expected_col_asset_amount(
+    let (asset_in_usd_precised, oracle_asset_st_rate) =
+      get_asset_usd_value(
         unified_control_validator_hash,
         reference_inputs,
-        borrow_output_st,
+        collateral_asset_amount,
         collateral_asset_pid,
         collateral_asset_an,
       )
 
-    trace @"immediately after calling get_expected_col_asset_amount"
-
-    trace @"hundred_percent_col_asset_value": hundred_percent_col_asset_value
-    trace @"expected_col_asset_amount": expected_col_asset_amount
+    let ltv_asset_in_usd_precised =
+      calculate_by_percentage(asset_in_usd_precised, 100, loan_to_value_ratio)
 
     and {
       // Both operand below are in product of the precision_factor
-      // amount of collateral asset user provides must correspond with the current rate of the asset
-      (hundred_percent_col_asset_value >= expected_col_asset_amount)?,
+      // amount of loan user is taking must not be greater than the loan to value ratio
+      (borrow_output_st * precision_factor <= ltv_asset_in_usd_precised)?,
+      trace @"bost...": borrow_output_st * precision_factor, ltv_asset_in_usd_precised
       // Oracle usd rate is same as the one in datum
       (oracle_asset_st_rate == collateral_rate_at_lending_precised)?,
     }
   }
-
   trace @"after is_col_amount_and_rate_valid"
 
   let is_loan_amount_valid = borrow_output_st >= min_loan_amount
@@ -295,10 +283,10 @@ fn validate_protocol_parameters(
   }
 }
 
-fn get_expected_col_asset_amount(
+fn get_asset_usd_value(
   unified_control_validator_hash: ScriptHash,
   reference_inputs: List<Input>,
-  borrow_output_st: Int,
+  collateral_asset_amount: Int,
   collateral_asset_pid: PolicyId,
   collateral_asset_an: AssetName,
 ) {
@@ -316,15 +304,18 @@ fn get_expected_col_asset_amount(
   // trace @"in get_expected_col_asset_amount immediately after expecting oracle_rate"
   let AssetRate { num, denum, .. } = oracle_rate
 
-  // how many lovelaces give one staterite (precised)
+  // how many of the asset give one staterite (precised)
   let oracle_asset_st_rate = num * precision_factor / denum
 
   // trace @"oracle_asset_st_rate": oracle_asset_st_rate
-  let expected_borrow_asset_amount = borrow_output_st * oracle_asset_st_rate
+  // trace @"oracle_asset_st_rate": oracle_asset_st_rate
+  let asset_in_usd_precised = collateral_asset_amount * oracle_asset_st_rate
 
+  // trace @"asset_in_usd_precised": asset_in_usd_precised
+  // trace @"collateral_asset_amount": collateral_asset_amount
   // trace @"expected_borrow_asset_amount": expected_borrow_asset_amount
   // trace @"borrow_output_st": borrow_output_st
-  (expected_borrow_asset_amount, oracle_asset_st_rate)
+  (asset_in_usd_precised, oracle_asset_st_rate)
 }
 
 fn validate_ada_collateral(

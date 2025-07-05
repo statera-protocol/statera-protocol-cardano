@@ -21,6 +21,7 @@ pub type CollateralValidatorDatum {
 pub type ControlDatum {
   OracleDatum { oracle_rates: List<AssetRate> }
   ProtocolParametersDatum {
+    loan_to_value_ratio: Int,
     min_collateral_ratio: Int,
     min_liquidation_threshold: Int,
     min_loan_amount: Int,

@@ -1,13 +1,8 @@
 import { mConStr0, mConStr1, stringToHex } from "@meshsdk/core";
-import { alwaysSuccessMintValidatorHash, multiSigAddress, multiSigCbor, multisigHash, multiSigUtxos, pParamsUtxo, StPparamsAssetName, StStableAssetName, txBuilder, wallet1, wallet1Address, wallet1Collateral, wallet1Utxos, wallet1VK, wallet2 } from "../setup.js";
+import { alwaysSuccessMintValidatorHash, multiSigAddress, multiSigCbor, multisigHash, multiSigUtxos, StPparamsAssetName, StStableAssetName, txBuilder, wallet1, wallet1Address, wallet1Collateral, wallet1Utxos, wallet1VK, wallet2 } from "../setup.js";
 import { UnifiedControlValidatorAddr, UnifiedControlValidatorHash, UnifiedControlValidatorScript } from "./validator.js";
-import { MintStValidatorHash } from "../StMinting/validator.js";
-
-const st_asset = mConStr0([
-    mConStr1([]),
-    MintStValidatorHash,
-    StStableAssetName,
-]);
+import { st_asset } from "../StMinting/validator.js";
+import { pParamsUtxo } from "../utils.js";
 
 const collateral_assets = [
     mConStr0([
@@ -71,6 +66,8 @@ const unsignedTx = await txBuilder
     .txInScript(multiSigCbor)
     .txOut(UnifiedControlValidatorAddr, [{ unit: UnifiedControlValidatorHash + StPparamsAssetName, quantity: "1" }])
     .txOutInlineDatumValue(ProtocolParametersDatum)
+    // send back some UTxO to multisig
+    .txOut(multiSigAddress, [{ unit: "lovelace", quantity: "20000000" }])
     .txInCollateral(
         wallet1Collateral.input.txHash,
         wallet1Collateral.input.outputIndex,

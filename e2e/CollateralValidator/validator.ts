@@ -1,5 +1,5 @@
-import { applyParamsToScript, builtinByteString, resolveScriptHash, serializePlutusScript } from "@meshsdk/core";
-import { blueprint, wallet1VK } from "../setup.js";
+import { applyParamsToScript, builtinByteString, deserializeDatum, resolveScriptHash, serializePlutusScript, stringToHex } from "@meshsdk/core";
+import { blueprint } from "../setup.js";
 import { UnifiedControlValidatorHash } from "../UnifiedControl/validator.js";
 
 const CollateralValidator = blueprint.validators.filter(v => 
@@ -20,8 +20,20 @@ const CollateralValidatorAddr = serializePlutusScript(
 
 console.log("CollateralValidatorHash:", CollateralValidatorHash);
 
+const receiptTokenName = "st-receipt";
+const receiptTokenNameHex = stringToHex(receiptTokenName);
+const receiptTokenUnit = CollateralValidatorHash +  receiptTokenNameHex;
+
+const identifierTokenName = "st-identifier";
+const identifierTokenNameHex = stringToHex(identifierTokenName);
+const identifierTokenUnit = CollateralValidatorHash +  identifierTokenNameHex;
+
 export {
     CollateralValidatorScript,
     CollateralValidatorHash,
     CollateralValidatorAddr,
+    receiptTokenNameHex,
+    receiptTokenUnit,
+    identifierTokenNameHex,
+    identifierTokenUnit,
 }

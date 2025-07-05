@@ -1,5 +1,5 @@
-import { applyParamsToScript, builtinByteString, conStr1, resolveScriptHash, serializePlutusScript } from "@meshsdk/core";
-import { blueprint, wallet1VK } from "../setup.js";
+import { applyParamsToScript, builtinByteString, conStr1, mConStr0, mConStr1, resolveScriptHash, serializePlutusScript } from "@meshsdk/core";
+import { blueprint, StStableAssetName, wallet1VK } from "../setup.js";
 import { CollateralValidatorHash } from "../CollateralValidator/validator.js";
 import { BatchingValidatorHash } from "../Batching/validators.js";
 
@@ -16,16 +16,26 @@ const MintStValidatorScript = applyParamsToScript(
     "JSON"
 );
 
-const MintStValidatorHash = resolveScriptHash(MintStValidatorScript, "V3");
+const MintStPolicy = resolveScriptHash(MintStValidatorScript, "V3");
 
 const MintStValidatorAddr = serializePlutusScript(
     { code: MintStValidatorScript, version: "V3" },
 ).address;
 
-console.log("MintStValidatorHash:", MintStValidatorHash);
+const stUnit = MintStPolicy + StStableAssetName;
+
+const st_asset = mConStr0([
+    mConStr1([]),
+    MintStPolicy,
+    StStableAssetName,
+]);
+
+console.log("MintStValidatorHash:", MintStPolicy);
 
 export {
     MintStValidatorScript,
-    MintStValidatorHash,
+    MintStPolicy,
     MintStValidatorAddr,
+    stUnit,
+    st_asset,
 }

@@ -1,41 +1,36 @@
-import { mConStr0, mConStr1, stringToHex } from "@meshsdk/core";
-import { alwaysSuccessMintValidatorHash, multiSigAddress, multiSigCbor, multisigHash, multiSigUtxos, StPparamsAssetName, StStableAssetName, txBuilder, wallet1, wallet1Address, wallet1Collateral, wallet1Utxos, wallet1VK, wallet2 } from "../setup.js";
+import { mConStr0, mConStr1 } from "@meshsdk/core";
+import { assetObject, multiSigAddress, multiSigCbor, multisigHash, multiSigUtxos, StPparamsAssetName, StStableAssetName, txBuilder, wallet1, wallet1Address, wallet1Collateral, wallet1Utxos, wallet1VK, wallet2 } from "../setup.js";
 import { UnifiedControlValidatorAddr, UnifiedControlValidatorHash, UnifiedControlValidatorScript } from "./validator.js";
-import { MintStValidatorHash } from "../StMinting/validator.js";
-
-const st_asset = mConStr0([
-    mConStr1([]),
-    MintStValidatorHash,
-    StStableAssetName,
-]);
+import { st_asset } from "../StMinting/validator.js";
 
 const collateral_assets = [
     mConStr0([
         mConStr0([]),
-        "",
-        stringToHex("lovelace"),
+        assetObject.ada.policy,
+        assetObject.ada.name,
     ]),
     mConStr0([
         mConStr1([]),
-        alwaysSuccessMintValidatorHash,
-        stringToHex("iUSD"),
+        assetObject.iUSD.policy,
+        assetObject.iUSD.name,
     ]),
     mConStr0([
         mConStr0([]),
-        alwaysSuccessMintValidatorHash,
-        stringToHex("hosky"),
+        assetObject.hosky.policy,
+        assetObject.hosky.name,
     ]),
 ];
 
 const swappable_assets = [
     mConStr0([
         mConStr1([]),
-        alwaysSuccessMintValidatorHash,
-        stringToHex("usdm"),
+        assetObject.USDM.policy,
+        assetObject.USDM.name,
     ]),
 ];
 
 const ProtocolParametersDatum = mConStr1([
+    80,
     150,
     120,
     10,
@@ -65,19 +60,21 @@ const unsignedTx = await txBuilder
     .mintRedeemerValue(mConStr1([]))
     .txOut(UnifiedControlValidatorAddr, [{ unit: UnifiedControlValidatorHash + StPparamsAssetName, quantity: "1" }])
     .txOutInlineDatumValue(ProtocolParametersDatum)
+    // send back some UTxO to multisig
+    .txOut(multiSigAddress, [{ unit: "lovelace", quantity: "20000000" }])
     .txInCollateral(
         wallet1Collateral.input.txHash,
         wallet1Collateral.input.outputIndex,
         wallet1Collateral.output.amount,
         wallet1Collateral.output.address,
     )
-    .changeAddress(multiSigAddress)
+    .changeAddress(wallet1Address)
     .selectUtxosFrom(wallet1Utxos)
-    .setFee("1180441")
+    .setFee("680441")
     .complete()
 
 const signedTx1 = await wallet1.signTx(unsignedTx, true);
 const signedTx2 = await wallet2.signTx(signedTx1, true);
 
 const txHash = await wallet1.submitTx(signedTx2);
-console.log("Set Protocol Parameters tx hash:", txHash);
+console.log("Create parameters tx hash:", txHash);
