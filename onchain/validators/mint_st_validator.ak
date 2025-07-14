@@ -10,7 +10,7 @@ use mocktail/virgin_output_reference.{mock_utxo_ref}
 use statera/constants.{precision_factor, st_stable_asset_name}
 use statera/datums.{CollateralDatum, CollateralValidatorDatum}
 use statera/types.{
-  AssetType, GetLoan, MintStRedeemer, PartialRepay, RepayLoan, Swap,
+  AssetType, GetLoanSt, MintStRedeemer, PartialRepayLoanSt, RepayLoanSt, SwapSt,
 }
 
 validator mint_st_validator(
@@ -21,9 +21,9 @@ validator mint_st_validator(
     let Transaction { inputs, outputs, mint, withdrawals, .. } = self
 
     when redeemer is {
-      GetLoan ->
+      GetLoanSt ->
         validate_get_loan(collateral_validator_hash, outputs, mint, policy_id)
-      RepayLoan | PartialRepay ->
+      RepayLoanSt | PartialRepayLoanSt ->
         validate_repay_and_partial_repay_loan(
           collateral_validator_hash,
           inputs,
@@ -32,7 +32,7 @@ validator mint_st_validator(
           policy_id,
           redeemer,
         )
-      Swap -> pairs.has_key(withdrawals, pool_batching_cred)?
+      SwapSt -> pairs.has_key(withdrawals, pool_batching_cred)?
     }
   }
 
@@ -112,8 +112,8 @@ fn validate_repay_and_partial_repay_loan(
   expect [Pair(_, quantity)] = mint |> assets.tokens(policy_id) |> dict.to_pairs
 
   when redeemer is {
-    RepayLoan -> (quantity == -st_borrowed)?
-    PartialRepay -> {
+    RepayLoanSt -> (quantity == -st_borrowed)?
+    PartialRepayLoanSt -> {
       let collateral_outputs =
         filter_collateral_outputs(outputs, collateral_validator_hash)
 
@@ -202,7 +202,7 @@ test test_mint_loan_tokens() {
   mint_st_validator.mint(
     collateral_validator_script_hash,
     pool_batching_sh,
-    GetLoan,
+    GetLoanSt,
     test_st_policy_id,
     tx,
   )
@@ -258,7 +258,7 @@ test test_burn_loan_tokens() {
   mint_st_validator.mint(
     collateral_validator_script_hash,
     pool_batching_sh,
-    RepayLoan,
+    RepayLoanSt,
     test_st_policy_id,
     tx,
   )
@@ -343,7 +343,7 @@ test test_partial_repay_burn() {
   mint_st_validator.mint(
     collateral_validator_script_hash,
     pool_batching_sh,
-    PartialRepay,
+    PartialRepayLoanSt,
     test_st_policy_id,
     tx,
   )

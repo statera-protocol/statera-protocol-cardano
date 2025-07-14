@@ -27,20 +27,23 @@ pub type SpendControl {
 }
 
 pub type CollateralValidatorRedeemer {
-  Refund
-  Liquidate
-  WithdrawDeposit
+  // For user's deposit (User's protocol's balance)
   IncreaseDeposit
-  PartialWithdrawal
-  IncreaseCollateral
-  PartialRepayment
+  PartialWithdrawDeposit
+  WithdrawDeposit
+  // For Loan positions
+  IncreaseLoanCollateral
+  ReduceLoanCollateral
+  PartialRepayLoan
+  RepayLoan
+  LiquidateLoan
 }
 
 pub type MintStRedeemer {
-  GetLoan
-  RepayLoan
-  PartialRepay
-  Swap
+  GetLoanSt
+  RepayLoanSt
+  PartialRepayLoanSt
+  SwapSt
 }
 
 pub type PoolBatchingRedeemer {
