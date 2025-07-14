@@ -1,11 +1,11 @@
-import { deserializeDatum, mConStr, mConStr0, mConStr1 } from "@meshsdk/core";
+import { deserializeDatum, mConStr, mConStr0, mConStr1, mConStr3 } from "@meshsdk/core";
 import { CollateralValidatorAddr, CollateralValidatorScript, identifierTokenUnit } from "../CollateralValidator/validator.js";
 import { blockchainProvider, txBuilder, wallet1, wallet1Address, wallet1Collateral, wallet1Utxos, wallet1VK } from "../setup.js";
 import { getLoanPositionDetails, getUserDepositUtxo } from "../utils.js";
 import { CollateralDatum } from "../types.js";
 
 const userDepositUtxo = getUserDepositUtxo();
-const increaseAmountInt = 30; // In ADA
+const increaseAmountInt = 50; // In ADA
 
 console.log("userDepositUtxo.output.amount[0].quantity:", userDepositUtxo.output.amount[0].quantity);
 
@@ -110,7 +110,7 @@ const unsignedTx = await txBuilder
     // .spendingTxInReference(cVRSTxHash, cVRSTxIndex)
     .txInScript(CollateralValidatorScript)
     .spendingReferenceTxInInlineDatumPresent()
-    .spendingReferenceTxInRedeemerValue(mConStr(4, []))
+    .spendingReferenceTxInRedeemerValue(mConStr1([]))
     // collateral utxo containing the collateral the user locked
     .spendingPlutusScriptV3()
     .txIn(
@@ -122,7 +122,7 @@ const unsignedTx = await txBuilder
     // .spendingTxInReference(cVRSTxHash, cVRSTxIndex)
     .txInScript(CollateralValidatorScript)
     .spendingReferenceTxInInlineDatumPresent()
-    .spendingReferenceTxInRedeemerValue(mConStr(5, []))
+    .spendingReferenceTxInRedeemerValue(mConStr3([]))
     // updated user balance output
     .txOut(CollateralValidatorAddr, [{ unit: "lovelace", quantity: balanceAmount }, { unit: identifierTokenUnit, quantity: "1" }])
     .txOutInlineDatumValue(DepositDatum)

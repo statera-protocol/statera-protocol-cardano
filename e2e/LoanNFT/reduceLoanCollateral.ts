@@ -1,11 +1,21 @@
-import { deserializeDatum, mConStr, mConStr0, mConStr1, mConStr2 } from "@meshsdk/core";
+import { deserializeDatum, mConStr, mConStr0, mConStr1 } from "@meshsdk/core";
+import { CollateralValidatorAddr, CollateralValidatorScript, identifierTokenUnit } from "../CollateralValidator/validator.js";
+import { blockchainProvider, collateralScriptIdx, collateralScriptTxHash, txBuilder, wallet1, wallet1Address, wallet1Collateral, wallet1Utxos, wallet1VK } from "../setup.js";
+import { getLoanPositionDetails, getOracleUtxo, getPParamsUtxo, getUserDepositUtxo } from "../utils.js";
 import { CollateralDatum } from "../types.js";
-import { blockchainProvider, collateralScriptIdx, collateralScriptTxHash, StStableAssetName, txBuilder, wallet1, wallet1Address, wallet1Collateral, wallet1Utxos, wallet1VK } from "../setup.js";
-import { CollateralValidatorAddr, CollateralValidatorScript } from "../CollateralValidator/validator.js";
-import { getLoanPositionDetails } from "../utils.js";
-import { MintStPolicy, MintStValidatorScript } from "../StMinting/validator.js";
 
-const repayAmountSUsd = String(50 * 1000000); // 50 sUSD; 50 million staterites
+const oracleUtxo = getOracleUtxo();
+const pParamsUtxo = getPParamsUtxo();
+
+const userDepositUtxo = getUserDepositUtxo();
+const reduceAmountInt = 15; // In ADA
+
+console.log("userDepositUtxo.output.amount[0].quantity:", userDepositUtxo.output.amount[0].quantity);
+
+const balanceAmountInt = (Number(userDepositUtxo.output.amount[0].quantity) + (Number(reduceAmountInt) * 1000000));
+if (balanceAmountInt < 2000000) throw new Error('Insufficient ADA balance');
+const balanceAmount = String(balanceAmountInt);
+console.log("balanceAmount:", balanceAmount);
 
 const allCollateralValidatorUtxos = await blockchainProvider.fetchAddressUTxOs(CollateralValidatorAddr);
 const collateralUtxos = allCollateralValidatorUtxos.filter(utxo => {
@@ -14,10 +24,8 @@ const collateralUtxos = allCollateralValidatorUtxos.filter(utxo => {
   const datum = deserializeDatum<CollateralDatum>(plutusData);
   return !!datum.fields[7];
 });
-// console.log("sajskasa:", collateralUtxos, '\n', collateralUtxos.length);
 
 const collateralUtxo = collateralUtxos[0];
-// console.log("collateralUtxo:", collateralUtxo.output.amount);
 const collateralUtxoDetails = getLoanPositionDetails(collateralUtxo);
 if (!collateralUtxoDetails) {
     throw new Error(`Could not get the loan position details of utxo: ${collateralUtxo}`);
@@ -30,10 +38,8 @@ const {
   loan_nft_asset_name,
   collateral_rate_at_lending_precised,
   collateral_asset,
-  collateral_asset_amount,
+  // collateral_asset_amount,
 } = collateralUtxoDetails;
-// console.log("collateral_asset_amount:", collateral_asset_amount);
-// console.log("loan_nft_pid:", loan_nft_pid);
 
 let userLoanNFTUnit = "";
 // Find the loan NFT UTxO corresponding to the provided collateral UTxO
@@ -58,10 +64,15 @@ if (!loanNftUtxo) {
 // console.log("userLoanNFTUnit:", userLoanNFTUnit);
 // console.log("collateralUtxo:", collateralUtxo);
 
-const updatedStBorrowed = Number(st_borrowed) - Number(repayAmountSUsd);
-console.log('st_borrowed------:', Number(st_borrowed));
-console.log('repayAmount------:', Number(repayAmountSUsd));
-console.log('updatedStBorrowed:', Number(updatedStBorrowed));
+const updatedCollateralAssetAmount =
+  String(Number(collateralUtxo.output.amount[0].quantity) - (Number(reduceAmountInt) * 1000000));
+console.log("CollateralAssetAmount:", Number(collateralUtxo.output.amount[0].quantity));
+console.log("updatedCollateralAssetAmount:", updatedCollateralAssetAmount);
+console.log("updatedCollateralAssetAmouns:", Number(st_borrowed));
+
+const DepositDatum = mConStr1([
+    wallet1VK,
+]);
 
 let collateralAssetStableness = undefined;
 if (collateral_asset.fields[0].constructor == 0) {
@@ -73,7 +84,7 @@ if (collateral_asset.fields[0].constructor == 0) {
 const updatedCollateralDatum = mConStr0([
   st_policy_id,
   st_asset_name,
-  updatedStBorrowed,
+  Number(st_borrowed),
   loan_nft_pid,
   loan_nft_asset_name,
   Number(collateral_rate_at_lending_precised),
@@ -82,7 +93,7 @@ const updatedCollateralDatum = mConStr0([
     collateral_asset.fields[1].bytes,
     collateral_asset.fields[2].bytes
   ]),
-  Number(collateral_asset_amount),
+  Number(updatedCollateralAssetAmount),
 ]);
 
 const unsignedTx = await txBuilder
@@ -93,6 +104,17 @@ const unsignedTx = await txBuilder
         loanNftUtxo.output.amount,
         loanNftUtxo.output.address,
     )
+    // user balance input
+    .spendingPlutusScriptV3()
+    .txIn(
+        userDepositUtxo.input.txHash,
+        userDepositUtxo.input.outputIndex,
+        userDepositUtxo.output.amount,
+        userDepositUtxo.output.address,
+    )
+    .spendingTxInReference(collateralScriptTxHash, collateralScriptIdx)
+    .spendingReferenceTxInInlineDatumPresent()
+    .spendingReferenceTxInRedeemerValue(mConStr0([]))
     // collateral utxo containing the collateral the user locked
     .spendingPlutusScriptV3()
     .txIn(
@@ -103,19 +125,17 @@ const unsignedTx = await txBuilder
     )
     .spendingTxInReference(collateralScriptTxHash, collateralScriptIdx)
     .spendingReferenceTxInInlineDatumPresent()
-    .spendingReferenceTxInRedeemerValue(mConStr(5, []))
-    // burn partial repay amount
-    .mintPlutusScriptV3()
-    .mint("-".concat(repayAmountSUsd), MintStPolicy, StStableAssetName)
-    // .mintTxInReference(mintLoanScriptTxHash, mintLoanScriptTxIndex)
-    .mintingScript(MintStValidatorScript)
-    .mintRedeemerValue(mConStr2([]))
+    .spendingReferenceTxInRedeemerValue(mConStr(4, []))
+    // updated user balance output
+    .txOut(CollateralValidatorAddr, [{ unit: "lovelace", quantity: balanceAmount }, { unit: identifierTokenUnit, quantity: "1" }])
+    .txOutInlineDatumValue(DepositDatum)
     // updated collateral output
-    .txOut(CollateralValidatorAddr, collateralUtxo.output.amount)
+    .txOut(CollateralValidatorAddr, [{ unit: "lovelace", quantity: updatedCollateralAssetAmount }])
     .txOutInlineDatumValue(updatedCollateralDatum)
     // user wallet output
     .txOut(wallet1Address, loanNftUtxo.output.amount)
-    // .txOut(wallet1Address, loanNftUtxo.output.amount)
+    .readOnlyTxInReference(oracleUtxo.input.txHash, oracleUtxo.input.outputIndex)
+    .readOnlyTxInReference(pParamsUtxo.input.txHash, pParamsUtxo.input.outputIndex)
     .txInCollateral(
         wallet1Collateral.input.txHash,
         wallet1Collateral.input.outputIndex,
@@ -123,10 +143,11 @@ const unsignedTx = await txBuilder
         wallet1Collateral.output.address,
     )
     .changeAddress(wallet1Address)
+    .requiredSignerHash(wallet1VK)
     .selectUtxosFrom(wallet1Utxos)
     .complete()
 
 const signedTx = await wallet1.signTx(unsignedTx);
 const txHash = await wallet1.submitTx(signedTx);
 
-console.log("Partial repay loan txHash:", txHash);
+console.log("Reduce collateral txHash:", txHash);

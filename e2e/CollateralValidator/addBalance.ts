@@ -3,7 +3,7 @@ import { txBuilder, wallet1, wallet1Address, wallet1Collateral, wallet1Utxos, wa
 import { CollateralValidatorAddr, CollateralValidatorScript, CollateralValidatorHash, receiptTokenNameHex, identifierTokenNameHex, receiptTokenUnit, identifierTokenUnit } from "./validator.js";
 
 // This field should be dynamic
-const depositAmountInt = 200; // In Ada
+const depositAmountInt = 300; // In Ada
 const depositAmount = String(depositAmountInt * 1000000);
 
 const depositDatum = mConStr1([

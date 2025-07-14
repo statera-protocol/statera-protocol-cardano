@@ -1,6 +1,6 @@
 import { deserializeDatum, UTxO } from "@meshsdk/core";
 import { CollateralDatum, DepositDatum, OracleDatum, ProtocolParametersDatum } from "./types.js";
-import { blockchainProvider, StOracleAssetName, StPparamsAssetName, wallet1VK } from "./setup.js";
+import { blockchainProvider, StLiquidationAssetName, StOracleAssetName, StPparamsAssetName, wallet1VK } from "./setup.js";
 import { UnifiedControlValidatorAddr, UnifiedControlValidatorHash } from "./UnifiedControl/validator.js";
 import { CollateralValidatorAddr } from "./CollateralValidator/validator.js";
 
@@ -34,20 +34,34 @@ const protocolParametersUtxo = UCVUtxos.find(utxo => {
     );
     return !!pParamsNft;
 });
-if (!protocolParametersUtxo) throw new Error("pParamsUtxo doesn't exist");
-const pParamsUtxo = protocolParametersUtxo;
-// console.log("pParamsUtxo:", pParamsUtxo);
+const getPParamsUtxo = () => {
+    if (!protocolParametersUtxo) throw new Error("pParamsUtxo doesn't exist");
+    return protocolParametersUtxo;
+}
 
 // Oracle UTxO
-const oracleUtxoTemp = UCVUtxos.find(utxo => {
+const oracleUtxo = UCVUtxos.find(utxo => {
     const oracleNft = utxo.output.amount.find(
         ast => ast.unit == UnifiedControlValidatorHash + StOracleAssetName
     );
     return !!oracleNft;
 });
-if (!oracleUtxoTemp) throw new Error("oracleUtxo doesn't exist");
-const oracleUtxo = oracleUtxoTemp;
-// console.log("oracleUtxo:", oracleUtxo);
+const getOracleUtxo = () => {
+    if (!oracleUtxo) throw new Error("oracleUtxo doesn't exist");
+    return oracleUtxo;
+}
+
+// Liq UTxO
+const liqUtxo = UCVUtxos.find(utxo => {
+    const liqNft = utxo.output.amount.find(
+        ast => ast.unit == UnifiedControlValidatorHash + StLiquidationAssetName
+    );
+    return !!liqNft;
+});
+const getLiqUtxo = () => {
+    if (!liqUtxo) throw new Error("liqUtxoTemp doesn't exist");
+    return liqUtxo;
+}
 
 const precisionFactor = 10000000; // 10 million
 
@@ -56,29 +70,33 @@ const getMaxStMint = (
   collateralAmmountInLovelaces: number,
   collateralAssetUnit: string,
 ) => {
-  const oraclePlutusData = oracleUtxo.output.plutusData;
-  if (!oraclePlutusData) throw new Error("no oracle datum");
-  const oracleDatum = deserializeDatum<OracleDatum>(oraclePlutusData);
+  if (oracleUtxo && protocolParametersUtxo) {
+    const oraclePlutusData = oracleUtxo.output.plutusData;
+    if (!oraclePlutusData) throw new Error("no oracle datum");
+    const oracleDatum = deserializeDatum<OracleDatum>(oraclePlutusData);
 
-  const assetRate = oracleDatum.fields[0].list.find(
-    (rate) => rate.fields[0].bytes == collateralAssetUnit
-  );
-  if (!assetRate) throw new Error("asset rate not found");
+    const assetRate = oracleDatum.fields[0].list.find(
+      (rate) => rate.fields[0].bytes == collateralAssetUnit
+    );
+    if (!assetRate) throw new Error("asset rate not found");
 
-  const pParamsPlutusData = pParamsUtxo.output.plutusData;
-  if (!pParamsPlutusData) throw new Error("no pParams datum");
-  const pParamsDatum = deserializeDatum<ProtocolParametersDatum>(pParamsPlutusData);
+    const pParamsPlutusData = protocolParametersUtxo.output.plutusData;
+    if (!pParamsPlutusData) throw new Error("no pParams datum");
+    const pParamsDatum = deserializeDatum<ProtocolParametersDatum>(pParamsPlutusData);
 
-  const loan_to_value_ratio = Number(pParamsDatum.fields[0].int);
+    const loan_to_value_ratio = Number(pParamsDatum.fields[0].int);
 
-  const assetUsdRatePrecised = (Number(assetRate.fields[1].int) * precisionFactor) / Number(assetRate.fields[2].int);
+    const assetUsdRatePrecised = (Number(assetRate.fields[1].int) * precisionFactor) / Number(assetRate.fields[2].int);
 
-  const lovelaceUsdValue =
-    collateralAmmountInLovelaces * (assetUsdRatePrecised / precisionFactor);
+    const lovelaceUsdValue =
+      collateralAmmountInLovelaces * (assetUsdRatePrecised / precisionFactor);
 
-  const maxStMint = (lovelaceUsdValue * loan_to_value_ratio) / 100;
+    const maxStMint = (lovelaceUsdValue * loan_to_value_ratio) / 100;
 
-  return [assetUsdRatePrecised, maxStMint];
+    return [assetUsdRatePrecised, maxStMint];
+  } else {
+    throw new Error('Oracle Utxo or Protocol Paramters Utxo not found');
+  }
 }
 
 const getLoanPositionDetails = (loanPosition: UTxO) => {
@@ -106,8 +124,9 @@ const getLoanPositionDetails = (loanPosition: UTxO) => {
 
 export {
   getUserDepositUtxo,
-  pParamsUtxo,
-  oracleUtxo,
+  getPParamsUtxo,
+  getOracleUtxo,
+  getLiqUtxo,
   getMaxStMint,
   getLoanPositionDetails,
 }

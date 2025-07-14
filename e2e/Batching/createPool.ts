@@ -1,7 +1,9 @@
 import { mConStr0, mConStr1 } from "@meshsdk/core";
 import { multiSigAddress, multiSigCbor, multiSigUtxos, StPoolNftName, txBuilder, wallet1, wallet1Address, wallet1Collateral, wallet1Utxos, wallet2 } from "../setup.js";
 import { batchingAsset, BatchingValidatorHash, PoolValidatorAddr, PoolValidatorHash, PoolValidatorScript } from "./validators.js";
-import { pParamsUtxo } from "../utils.js";
+import { getPParamsUtxo } from "../utils.js";
+
+const pParamsUtxo = getPParamsUtxo();
 
 const PoolDatum = mConStr0([
     mConStr1([BatchingValidatorHash])

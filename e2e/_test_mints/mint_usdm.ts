@@ -1,3 +1,4 @@
+import { hexToString } from "@meshsdk/core";
 import { batchingAsset } from "../Batching/validators.js";
 import { alwaysSuccessValidatorMintScript, txBuilder, wallet1, wallet1Address, wallet1Collateral, wallet1Utxos } from "../setup.js";
 
@@ -20,4 +21,4 @@ const unsignedTx = await txBuilder
 const signedTx = await wallet1.signTx(unsignedTx);
 
 const txHash = await wallet1.submitTx(signedTx);
-console.log("Mint usdm:", txHash);
+console.log(`Mint ${hexToString(batchingAsset.name)}:`, txHash);

@@ -1,6 +1,9 @@
 import { mConStr0 } from "@meshsdk/core";
 import { assetObject, multiSigAddress, multiSigCbor, multiSigUtxos, StOracleAssetName, txBuilder, wallet1, wallet1Address, wallet1Collateral, wallet1Utxos, wallet2 } from "../setup.js";
 import { UnifiedControlValidatorAddr, UnifiedControlValidatorHash, UnifiedControlValidatorScript } from "./validator.js";
+import { getOracleUtxo } from "../utils.js";
+
+const oracleUtxo = getOracleUtxo();
 
 const OracleDatum = mConStr0([[
   mConStr0([
@@ -20,6 +23,16 @@ if (!multiSigCbor) {
 }
 
 const unsignedTx = await txBuilder
+    .spendingPlutusScriptV3()
+    .txIn(
+        oracleUtxo.input.txHash,
+        oracleUtxo.input.outputIndex,
+        oracleUtxo.output.amount,
+        oracleUtxo.output.address,
+    )
+    .txInScript(UnifiedControlValidatorScript)
+    .spendingReferenceTxInInlineDatumPresent()
+    .spendingReferenceTxInRedeemerValue(mConStr0([]))
     .txIn(
         multiSigUtxos[0].input.txHash,
         multiSigUtxos[0].input.outputIndex,
@@ -27,10 +40,6 @@ const unsignedTx = await txBuilder
         multiSigUtxos[0].output.address,
     )
     .txInScript(multiSigCbor)
-    .mintPlutusScriptV3()
-    .mint("1", UnifiedControlValidatorHash, StOracleAssetName)
-    .mintingScript(UnifiedControlValidatorScript)
-    .mintRedeemerValue(mConStr0([]))
     .txOut(UnifiedControlValidatorAddr, [{ unit: UnifiedControlValidatorHash + StOracleAssetName, quantity: "1" }])
     .txOutInlineDatumValue(OracleDatum)
     // send back multisig value to multisig
@@ -43,11 +52,11 @@ const unsignedTx = await txBuilder
     )
     .changeAddress(wallet1Address)
     .selectUtxosFrom(wallet1Utxos)
-    .setFee("480441")
+    .setFee("454486")
     .complete()
 
 const signedTx1 = await wallet1.signTx(unsignedTx, true);
 const signedTx2 = await wallet2.signTx(signedTx1, true);
 
 const txHash = await wallet1.submitTx(signedTx2);
-console.log("Create oracle tx hash:", txHash);
+console.log("Update Oracle tx hash:", txHash);

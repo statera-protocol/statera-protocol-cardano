@@ -15,6 +15,7 @@ type OrderDatumType = ConStr0<[
     OrderType,
     PubKeyAddress,
     BuiltinByteString,
+    AssetType,
 ]>;
 
 // Deposit/Balance Datum

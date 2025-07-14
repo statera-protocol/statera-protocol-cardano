@@ -1,6 +1,9 @@
 import { mConStr2 } from "@meshsdk/core";
-import { multiSigAddress, multiSigCbor, multisigHash, multiSigUtxos, StLiquidationAssetName, txBuilder, wallet1, wallet1Address, wallet1Collateral, wallet1Utxos, wallet2 } from "../setup.js";
+import { multiSigAddress, multiSigCbor, multisigHash, multiSigUtxos, StLiquidationAssetName, StOracleAssetName, txBuilder, wallet1, wallet1Address, wallet1Collateral, wallet1Utxos, wallet2 } from "../setup.js";
 import { UnifiedControlValidatorAddr, UnifiedControlValidatorHash, UnifiedControlValidatorScript } from "./validator.js";
+import { getLiqUtxo } from "../utils.js";
+
+const liqUtxo = getLiqUtxo();
 
 const LiqAddrDatum = mConStr2([multisigHash]);
 
@@ -9,6 +12,16 @@ if (!multiSigCbor) {
 }
 
 const unsignedTx = await txBuilder
+    .spendingPlutusScriptV3()
+    .txIn(
+        liqUtxo.input.txHash,
+        liqUtxo.input.outputIndex,
+        liqUtxo.output.amount,
+        liqUtxo.output.address,
+    )
+    .txInScript(UnifiedControlValidatorScript)
+    .spendingReferenceTxInInlineDatumPresent()
+    .spendingReferenceTxInRedeemerValue(mConStr2([]))
     .txIn(
         multiSigUtxos[0].input.txHash,
         multiSigUtxos[0].input.outputIndex,
@@ -16,10 +29,6 @@ const unsignedTx = await txBuilder
         multiSigUtxos[0].output.address,
     )
     .txInScript(multiSigCbor)
-    .mintPlutusScriptV3()
-    .mint("1", UnifiedControlValidatorHash, StLiquidationAssetName)
-    .mintingScript(UnifiedControlValidatorScript)
-    .mintRedeemerValue(mConStr2([]))
     .txOut(UnifiedControlValidatorAddr, [{ unit: UnifiedControlValidatorHash + StLiquidationAssetName, quantity: "1" }])
     .txOutInlineDatumValue(LiqAddrDatum)
     // send back multisig value to multisig
@@ -32,11 +41,11 @@ const unsignedTx = await txBuilder
     )
     .changeAddress(wallet1Address)
     .selectUtxosFrom(wallet1Utxos)
-    .setFee("480441")
+    .setFee("454486")
     .complete()
 
 const signedTx1 = await wallet1.signTx(unsignedTx, true);
 const signedTx2 = await wallet2.signTx(signedTx1, true);
 
 const txHash = await wallet1.submitTx(signedTx2);
-console.log("Create liquidation address tx hash:", txHash);
+console.log("Update Liquidation Address tx hash:", txHash);

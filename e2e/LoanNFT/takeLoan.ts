@@ -1,11 +1,12 @@
-import { deserializeDatum, integer, mConStr, mConStr0, mConStr1, mConStr2, stringToHex } from "@meshsdk/core";
-import { assetObject, blockchainProvider, StStableAssetName, txBuilder, wallet1, wallet1Address, wallet1Collateral, wallet1Utxos, wallet1VK } from "../setup.js";
-import { CollateralValidatorAddr, CollateralValidatorScript, identifierTokenUnit } from "../CollateralValidator/validator.js";
+import { mConStr, mConStr0, mConStr1, stringToHex } from "@meshsdk/core";
+import { assetObject, collateralScriptIdx, collateralScriptTxHash, StStableAssetName, txBuilder, wallet1, wallet1Address, wallet1Collateral, wallet1Utxos, wallet1VK } from "../setup.js";
+import { CollateralValidatorAddr, identifierTokenUnit } from "../CollateralValidator/validator.js";
 import { LoanNftPolicy, LoanNftValidatorScript } from "./validator.js";
 import { MintStPolicy, MintStValidatorScript, stUnit } from "../StMinting/validator.js";
-import { getMaxStMint, getUserDepositUtxo, oracleUtxo, pParamsUtxo } from "../utils.js";
-// import { aBorrowInput, collateralValidatorAddress, loanNftPolicyId, loanNftValidatorScript, oracleUtxo, protocolParametersUtxo, mintLoanAssetNameHex, mintLoanPolicyId, mintLoanUnit, mintLoanValidatorScript, userDepositUtxos, collateralValidatorScript } from "./setup.js";
-// import { calculateLoanAmount, DepositDatum } from "./util.js";
+import { getMaxStMint, getOracleUtxo, getPParamsUtxo, getUserDepositUtxo } from "../utils.js";
+
+const oracleUtxo = getOracleUtxo();
+const pParamsUtxo = getPParamsUtxo();
 
 const userDepositUtxo = getUserDepositUtxo();
 console.log("userDepositUtxo:", userDepositUtxo);
@@ -50,9 +51,6 @@ const depositDatum = mConStr1([
   wallet1VK
 ]);
 
-const collateralScriptTxHash = "1f1117c2ab35017a0499ac5368635b36300fde33bd4c1e6523d46ac187d6c956";
-const collateralScriptIdx = 0;
-
 const unsignedTx = await txBuilder
     // spend deposit utxo by user
     .spendingPlutusScriptV3()
@@ -65,7 +63,7 @@ const unsignedTx = await txBuilder
     // .txInScript(CollateralValidatorScript)
     .spendingTxInReference(collateralScriptTxHash, collateralScriptIdx)
     .spendingReferenceTxInInlineDatumPresent()
-    .spendingReferenceTxInRedeemerValue(mConStr(4, []))
+    .spendingReferenceTxInRedeemerValue(mConStr1([]))
     // mint loan NFT
     .mintPlutusScriptV3()
     .mint("1", LoanNftPolicy, loanNftNameHex)

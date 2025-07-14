@@ -60,8 +60,8 @@ const unsignedTx = await txBuilder
     .mintRedeemerValue(mConStr1([]))
     .txOut(UnifiedControlValidatorAddr, [{ unit: UnifiedControlValidatorHash + StPparamsAssetName, quantity: "1" }])
     .txOutInlineDatumValue(ProtocolParametersDatum)
-    // send back some UTxO to multisig
-    .txOut(multiSigAddress, [{ unit: "lovelace", quantity: "20000000" }])
+    // send back multisig value to multisig
+    .txOut(multiSigAddress, multiSigUtxos[0].output.amount)
     .txInCollateral(
         wallet1Collateral.input.txHash,
         wallet1Collateral.input.outputIndex,

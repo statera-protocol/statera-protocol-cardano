@@ -3,7 +3,9 @@ import { blockchainProvider, StPoolNftName, StStableAssetName, txBuilder, wallet
 import { MintStPolicy, MintStValidatorScript, stUnit } from "../StMinting/validator.js";
 import { batchingAsset, BatchingRewardAddr, BatchingValidatorHash, BatchingValidatorScript, OrderValidatorAddr, OrderValidatorHash, OrderValidatorRewardAddr, OrderValidatorScript, PoolValidatorAddr, PoolValidatorHash, PoolValidatorScript } from "./validators.js";
 import { OrderDatumType } from "../types.js";
-import { pParamsUtxo } from "../utils.js";
+import { getPParamsUtxo } from "../utils.js";
+
+const pParamsUtxo = getPParamsUtxo();
 
 const poolAssetUnit = batchingAsset.unit;
 

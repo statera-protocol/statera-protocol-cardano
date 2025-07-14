@@ -1,4 +1,4 @@
-import { mConStr1, mConStr3 } from "@meshsdk/core";
+import { mConStr0, mConStr1, mConStr3 } from "@meshsdk/core";
 import { txBuilder, wallet1, wallet1Address, wallet1Collateral, wallet1Utxos, wallet1VK } from "../setup.js";
 import { CollateralValidatorAddr, CollateralValidatorScript, identifierTokenUnit } from "./validator.js";
 import { getUserDepositUtxo } from "../utils.js";
@@ -6,7 +6,7 @@ import { getUserDepositUtxo } from "../utils.js";
 const userDepositUtxo = getUserDepositUtxo();
 
 // This field should be dynamic
-const depositAmountInt = 200; // In Ada
+const depositAmountInt = 100; // In Ada
 const totalDepositAmountInt = (depositAmountInt * 1000000) + Number(userDepositUtxo.output.amount[0].quantity)
 const depositAmount = String(totalDepositAmountInt);
 
@@ -24,7 +24,7 @@ const unsignedTx = await txBuilder
     )
     .txInScript(CollateralValidatorScript)
     .spendingReferenceTxInInlineDatumPresent()
-    .spendingReferenceTxInRedeemerValue(mConStr3([]))
+    .spendingReferenceTxInRedeemerValue(mConStr0([]))
     .txOut(CollateralValidatorAddr, [{ unit: "lovelace", quantity: depositAmount }, { unit: identifierTokenUnit, quantity: "1" }])
     .txOutInlineDatumValue(depositDatum)
     .txInCollateral(

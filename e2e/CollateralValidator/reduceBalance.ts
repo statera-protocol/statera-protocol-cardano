@@ -1,4 +1,4 @@
-import { mConStr, mConStr1, mConStr3, stringToHex } from "@meshsdk/core";
+import { mConStr1 } from "@meshsdk/core";
 import { txBuilder, wallet1, wallet1Address, wallet1Collateral, wallet1Utxos, wallet1VK } from "../setup.js";
 import { CollateralValidatorAddr, CollateralValidatorScript, identifierTokenUnit } from "./validator.js";
 import { getUserDepositUtxo } from "../utils.js";
@@ -25,7 +25,7 @@ const unsignedTx = await txBuilder
     )
     .txInScript(CollateralValidatorScript)
     .spendingReferenceTxInInlineDatumPresent()
-    .spendingReferenceTxInRedeemerValue(mConStr(4, []))
+    .spendingReferenceTxInRedeemerValue(mConStr1([]))
     .txOut(wallet1Address, [{ unit: "lovelace", quantity: withdrawAmount }])
     .txOut(CollateralValidatorAddr, [{ unit: "lovelace", quantity: balanceAmount },  { unit: identifierTokenUnit, quantity: "1" }])
     .txOutInlineDatumValue(depositDatum)

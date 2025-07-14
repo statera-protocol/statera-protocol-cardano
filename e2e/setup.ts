@@ -126,6 +126,10 @@ const StPoolNftName = stringToHex("SPN");
 const StOracleAssetName = stringToHex("STO");
 const StLiquidationAssetName = stringToHex("STL");
 
+// Reference scripts
+const collateralScriptTxHash = "6a2604c22ab4318e7b27755b0306c6a08899e59b57e9eedabefd4803f59b4821";
+const collateralScriptIdx = 0;
+
 const assetObject = {
     "ada": {
         unit: stringToHex("lovelace"),
@@ -178,4 +182,7 @@ export {
     StOracleAssetName,
     StLiquidationAssetName,
     assetObject,
+    // Ref scripts
+    collateralScriptTxHash,
+    collateralScriptIdx,
 }
