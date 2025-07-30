@@ -31,9 +31,9 @@ const unsignedTx = await txBuilder
         { unit: poolAssetUnit, quantity: "1000000000" },
         { unit: PoolValidatorHash + StPoolNftName, quantity: "1" }
     ])
+    .txOutInlineDatumValue(PoolDatum)
     // send back some UTxO to multisig
     .txOut(multiSigAddress, [{ unit: "lovelace", quantity: "20000000" }])
-    .txOutInlineDatumValue(PoolDatum)
     .readOnlyTxInReference(pParamsUtxo.input.txHash, pParamsUtxo.input.outputIndex)
     .txInCollateral(
         wallet1Collateral.input.txHash,
@@ -43,7 +43,7 @@ const unsignedTx = await txBuilder
     )
     .changeAddress(wallet1Address)
     .selectUtxosFrom(wallet1Utxos)
-    .setFee("1130441")
+    .setFee("1184029")
     .complete()
 
 const signedTx1 = await wallet1.signTx(unsignedTx, true);

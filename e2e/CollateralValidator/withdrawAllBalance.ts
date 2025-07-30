@@ -31,4 +31,4 @@ const unsignedTx = await txBuilder
 const signedTx = await wallet1.signTx(unsignedTx);
 const txHash = await wallet1.submitTx(signedTx);
 
-console.log("withdraw balance txHash:", txHash);
+console.log("Withdraw all balance txHash:", txHash);

@@ -94,7 +94,6 @@ const unsignedTx = await txBuilder
     .changeAddress(wallet1Address)
     .requiredSignerHash(wallet1VK)
     .selectUtxosFrom(wallet1Utxos)
-    // .selectUtxosFrom(userDepositUtxos)
     .complete()
 
 const signedTx = await wallet1.signTx(unsignedTx);

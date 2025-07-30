@@ -431,12 +431,6 @@ fn handle_increase_collateral(
     if collateral_asset_pid == "" {
       (lovelace_of(collateral_output.value) == expected_new_collateral_balance)?
     } else {
-      // trace @"qtof..": quantity_of(
-      //   collateral_output.value,
-      //   collateral_asset_pid,
-      //   collateral_asset_an,
-      // )
-      // trace @"expected_new_collateral_balance": expected_new_collateral_balance
       (quantity_of(
         collateral_output.value,
         collateral_asset_pid,
@@ -806,10 +800,6 @@ fn handle_partial_repayment(
   // calculate the quantity of loan tokens being repayed
   let user_st_amount_given =
     user_wallet_total_st_asset_input - user_wallet_total_st_asset_output
-  // trace @"user_st_amount_given": user_st_amount_given
-  // trace @"loan_token_burn_quantity": loan_token_burn_quantity
-  // Make sure loan_token_burn_quantity is the exact same amount of st going out of the user's wallet
-  expect user_st_amount_given == -1 * loan_token_burn_quantity
 
   // calculate the amount of remaining unpaid loan
   let remaining_unpaid_loan = st_borrowed - -1 * loan_token_burn_quantity
@@ -828,6 +818,8 @@ fn handle_partial_repayment(
     (st_asset_name == loan_token_name)?,
     // make sure collateral value is not tampered with
     (own_input.output.value == collateral_output.value)?,
+    // Make sure loan_token_burn_quantity is the exact same amount of st going out of the user's wallet
+    (user_st_amount_given == -1 * loan_token_burn_quantity)?,
   }
 }
 

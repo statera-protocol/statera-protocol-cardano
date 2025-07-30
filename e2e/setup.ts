@@ -48,8 +48,8 @@ const wallet1 = new MeshWallet({
 const wallet1Address = await wallet1.getChangeAddress();
 
 const wallet1Utxos = await wallet1.getUtxos();
-// const wallet1Collateral: UTxO = (await blockchainProvider.fetchUTxOs("8b106e8eee2d7648a82e8e66d37b647685bdaf240e7e8028624a5e894e53c31f", 2))[0]
-const wallet1Collateral: UTxO = (await wallet1.getCollateral())[0]
+const wallet1Collateral: UTxO = (await blockchainProvider.fetchUTxOs("5d69f9d07b31dc6562c0cc9967edc78cf46f76a417f03b235a664b02797731dd", 1))[0]
+// const wallet1Collateral: UTxO = (await wallet1.getCollateral())[0]
 if (!wallet1Collateral) {
     throw new Error('No collateral utxo found');
 }
@@ -103,7 +103,7 @@ const txBuilder = new MeshTxBuilder({
     fetcher: blockchainProvider,
     submitter: blockchainProvider,
     // evaluator: evaluator, // Can also be "evaluator: blockchainProvider,"
-    evaluator: blockchainProvider,
+    // evaluator: blockchainProvider,
     verbose: false,
 });
 txBuilder.setNetwork('preprod');
@@ -127,8 +127,12 @@ const StOracleAssetName = stringToHex("STO");
 const StLiquidationAssetName = stringToHex("STL");
 
 // Reference scripts
-const collateralScriptTxHash = "6a2604c22ab4318e7b27755b0306c6a08899e59b57e9eedabefd4803f59b4821";
+const collateralScriptTxHash = "a06509e429311b9940d3a685b91218755397de2510e297b0308427aa3edf8170";
 const collateralScriptIdx = 0;
+const mintStScriptTxHash = "9a92b88a1bfcd36cf24d653a3038693b40e27e74d0cc326634bf1dc06acfcccd";
+const mintStScriptTxIdx = 0;
+const batchingScriptTxHash = "5e353710d08f07044da43af8aa1d7e20cbb9f9b46e4b2d5ff60d9015f9414a21";
+const batchingScriptTxIdx = 0;
 
 const assetObject = {
     "ada": {
@@ -185,4 +189,8 @@ export {
     // Ref scripts
     collateralScriptTxHash,
     collateralScriptIdx,
+    mintStScriptTxHash,
+    mintStScriptTxIdx,
+    batchingScriptTxHash,
+    batchingScriptTxIdx,
 }

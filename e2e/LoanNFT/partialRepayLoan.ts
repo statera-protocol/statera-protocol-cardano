@@ -1,9 +1,9 @@
 import { deserializeDatum, mConStr, mConStr0, mConStr1, mConStr2 } from "@meshsdk/core";
 import { CollateralDatum } from "../types.js";
-import { blockchainProvider, collateralScriptIdx, collateralScriptTxHash, StStableAssetName, txBuilder, wallet1, wallet1Address, wallet1Collateral, wallet1Utxos, wallet1VK } from "../setup.js";
+import { blockchainProvider, collateralScriptIdx, collateralScriptTxHash, mintStScriptTxHash, mintStScriptTxIdx, StStableAssetName, txBuilder, wallet1, wallet1Address, wallet1Collateral, wallet1Utxos, wallet1VK } from "../setup.js";
 import { CollateralValidatorAddr, CollateralValidatorScript } from "../CollateralValidator/validator.js";
 import { getLoanPositionDetails } from "../utils.js";
-import { MintStPolicy, MintStValidatorScript } from "../StMinting/validator.js";
+import { MintStPolicy, MintStValidatorScript, stUnit } from "../StMinting/validator.js";
 
 const repayAmountSUsd = String(50 * 1000000); // 50 sUSD; 50 million staterites
 
@@ -86,13 +86,6 @@ const updatedCollateralDatum = mConStr0([
 ]);
 
 const unsignedTx = await txBuilder
-    // loan NFT input from user's wallet
-    .txIn(
-        loanNftUtxo.input.txHash,
-        loanNftUtxo.input.outputIndex,
-        loanNftUtxo.output.amount,
-        loanNftUtxo.output.address,
-    )
     // collateral utxo containing the collateral the user locked
     .spendingPlutusScriptV3()
     .txIn(
@@ -102,20 +95,18 @@ const unsignedTx = await txBuilder
         collateralUtxo.output.address,
     )
     .spendingTxInReference(collateralScriptTxHash, collateralScriptIdx)
+    // .txInScript(CollateralValidatorScript)
     .spendingReferenceTxInInlineDatumPresent()
     .spendingReferenceTxInRedeemerValue(mConStr(5, []))
     // burn partial repay amount
     .mintPlutusScriptV3()
     .mint("-".concat(repayAmountSUsd), MintStPolicy, StStableAssetName)
-    // .mintTxInReference(mintLoanScriptTxHash, mintLoanScriptTxIndex)
+    // .mintTxInReference(mintStScriptTxHash, mintStScriptTxIdx)
     .mintingScript(MintStValidatorScript)
     .mintRedeemerValue(mConStr2([]))
     // updated collateral output
     .txOut(CollateralValidatorAddr, collateralUtxo.output.amount)
     .txOutInlineDatumValue(updatedCollateralDatum)
-    // user wallet output
-    .txOut(wallet1Address, loanNftUtxo.output.amount)
-    // .txOut(wallet1Address, loanNftUtxo.output.amount)
     .txInCollateral(
         wallet1Collateral.input.txHash,
         wallet1Collateral.input.outputIndex,

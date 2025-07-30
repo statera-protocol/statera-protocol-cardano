@@ -1,5 +1,5 @@
 import { ConStr0, deserializeDatum, mConStr0, mConStr1, mConStr3, stringToHex } from "@meshsdk/core";
-import { blockchainProvider, StPoolNftName, StStableAssetName, txBuilder, wallet1, wallet1Address, wallet1Collateral, wallet1Utxos, wallet1VK, wallet2Address } from "../setup.js";
+import { batchingScriptTxHash, batchingScriptTxIdx, blockchainProvider, StPoolNftName, StStableAssetName, txBuilder, wallet1, wallet1Address, wallet1Collateral, wallet1Utxos, wallet1VK, wallet2Address } from "../setup.js";
 import { MintStPolicy, MintStValidatorScript, stUnit } from "../StMinting/validator.js";
 import { batchingAsset, BatchingRewardAddr, BatchingValidatorHash, BatchingValidatorScript, OrderValidatorAddr, OrderValidatorHash, OrderValidatorRewardAddr, OrderValidatorScript, PoolValidatorAddr, PoolValidatorHash, PoolValidatorScript } from "./validators.js";
 import { OrderDatumType } from "../types.js";
@@ -27,14 +27,10 @@ const batchingOrderUtxos = AllOrderUtxos;
 // });
 // console.log("batchingOrderUtxos:", batchingOrderUtxos);
 
-const poolUtxo = (await blockchainProvider.fetchAddressUTxOs(PoolValidatorAddr))[0];
+const poolUtxo = (await blockchainProvider.fetchAddressUTxOs(PoolValidatorAddr))[1];
 
-const batchingScriptTxHash = "bc85cb10c929dc6770112200d73c70bae6a50701098c815eb25aa0f657942b4c";
-const batchingScriptTxIndex = 0;
-const orderScriptTxHash = "";
-const orderScriptTxIndex = 0;
-
-const stMinted = 18000000;
+const stMinted = 15000000;
+// const stMinted = 23000000;
 const poolUtxoBalance = (() => {
     const poolAsset = poolUtxo.output.amount.find(ast => ast.unit == poolAssetUnit);
     if (!poolAsset) {
@@ -73,12 +69,35 @@ const PoolBatchingRedeemer = mConStr0([
 //         .spendingReferenceTxInRedeemerValue("")
 // };
 
+console.log("batchingOrderUtxos 0:", batchingOrderUtxos[0].output.amount);
+// console.log("batchingOrderUtxos 1:", batchingOrderUtxos[1].output.amount);
+// console.log("batchingOrderUtxos 2:", batchingOrderUtxos[2].output.amount);
+console.log("stUnit:", stUnit);
+console.log("poolAssetUnit:", poolAssetUnit);
+// console.log("batchingOrderUtxos 3:", batchingOrderUtxos[3].output.amount);
+
+const mem = 1400000;
+const steps = 1000000000;
+
 const unsignedTx = await txBuilder
     // mint st tokens
     .mintPlutusScriptV3()
     .mint(String(stMinted), MintStPolicy, StStableAssetName)
     .mintingScript(MintStValidatorScript)
-    .mintRedeemerValue(mConStr3([]))
+    // .mintRedeemerValue(mConStr3([]))
+    .mintRedeemerValue(mConStr3([]), undefined, { mem, steps })
+    // order withdrawal (Process Order)
+    .withdrawalPlutusScriptV3()
+    .withdrawal(OrderValidatorRewardAddr, "0")
+    .withdrawalScript(OrderValidatorScript)
+    // .withdrawalRedeemerValue(mConStr1([]))
+    .withdrawalRedeemerValue(mConStr1([]), undefined, { mem, steps })
+    // batching
+    .withdrawalPlutusScriptV3()
+    .withdrawal(BatchingRewardAddr, "0")
+    .withdrawalTxInReference(batchingScriptTxHash, batchingScriptTxIdx, undefined, BatchingValidatorHash)
+    // .withdrawalRedeemerValue(PoolBatchingRedeemer)
+    .withdrawalRedeemerValue(PoolBatchingRedeemer, undefined, { mem, steps })
     // order spend 0
     .spendingPlutusScriptV3()
     .txIn(
@@ -89,34 +108,32 @@ const unsignedTx = await txBuilder
     )
     .txInScript(OrderValidatorScript)
     .spendingReferenceTxInInlineDatumPresent()
-    .spendingReferenceTxInRedeemerValue("")
-    // order spend 1
-    .spendingPlutusScriptV3()
-    .txIn(
-        batchingOrderUtxos[1].input.txHash,
-        batchingOrderUtxos[1].input.outputIndex,
-        batchingOrderUtxos[1].output.amount,
-        batchingOrderUtxos[1].output.address,
-    )
-    .txInScript(OrderValidatorScript)
-    .spendingReferenceTxInInlineDatumPresent()
-    .spendingReferenceTxInRedeemerValue("")
-    // order spend 2
-    .spendingPlutusScriptV3()
-    .txIn(
-        batchingOrderUtxos[2].input.txHash,
-        batchingOrderUtxos[2].input.outputIndex,
-        batchingOrderUtxos[2].output.amount,
-        batchingOrderUtxos[2].output.address,
-    )
-    .txInScript(OrderValidatorScript)
-    .spendingReferenceTxInInlineDatumPresent()
-    .spendingReferenceTxInRedeemerValue("")
-    // order withdrawal (Process Order)
-    .withdrawalPlutusScriptV3()
-    .withdrawal(OrderValidatorRewardAddr, "0")
-    .withdrawalScript(OrderValidatorScript)
-    .withdrawalRedeemerValue(mConStr1([]))
+    // .spendingReferenceTxInRedeemerValue("")
+    .spendingReferenceTxInRedeemerValue("", undefined, { mem, steps })
+    // // order spend 1
+    // .spendingPlutusScriptV3()
+    // .txIn(
+    //     batchingOrderUtxos[1].input.txHash,
+    //     batchingOrderUtxos[1].input.outputIndex,
+    //     batchingOrderUtxos[1].output.amount,
+    //     batchingOrderUtxos[1].output.address,
+    // )
+    // .txInScript(OrderValidatorScript)
+    // .spendingReferenceTxInInlineDatumPresent()
+    // .spendingReferenceTxInRedeemerValue("")
+    // // .spendingReferenceTxInRedeemerValue("", undefined, { mem, steps })
+    // // order spend 2
+    // .spendingPlutusScriptV3()
+    // .txIn(
+    //     batchingOrderUtxos[2].input.txHash,
+    //     batchingOrderUtxos[2].input.outputIndex,
+    //     batchingOrderUtxos[2].output.amount,
+    //     batchingOrderUtxos[2].output.address,
+    // )
+    // .txInScript(OrderValidatorScript)
+    // .spendingReferenceTxInInlineDatumPresent()
+    // .spendingReferenceTxInRedeemerValue("")
+    // .spendingReferenceTxInRedeemerValue("", undefined, { mem, steps })
     // spend pool utxo
     .spendingPlutusScriptV3()
     .txIn(
@@ -127,12 +144,8 @@ const unsignedTx = await txBuilder
     )
     .txInScript(PoolValidatorScript)
     .spendingReferenceTxInInlineDatumPresent()
-    .spendingReferenceTxInRedeemerValue("")
-    // batching
-    .withdrawalPlutusScriptV3()
-    .withdrawal(BatchingRewardAddr, "0")
-    .withdrawalTxInReference(batchingScriptTxHash, batchingScriptTxIndex, undefined, BatchingValidatorHash)
-    .withdrawalRedeemerValue(PoolBatchingRedeemer)
+    // .spendingReferenceTxInRedeemerValue("")
+    .spendingReferenceTxInRedeemerValue("", undefined, { mem, steps })
     // pool output utxo
     .txOut(PoolValidatorAddr, [
         { unit: poolAssetUnit, quantity: String(poolOutChange) },
@@ -142,18 +155,23 @@ const unsignedTx = await txBuilder
     // order output 0
     .txOut(wallet1Address, [
         batchingOrderUtxos[0].output.amount[0], poolUtxo.output.amount[0],
-        { unit: stUnit, quantity: String(10000000) }
-    ])
-    // order output 1
-    .txOut(wallet1Address, [
-        batchingOrderUtxos[1].output.amount[0], poolUtxo.output.amount[0],
-        { unit: poolAssetUnit, quantity: String(7000000) }
-    ])
-    // order output 2
-    .txOut(wallet1Address, [
-        batchingOrderUtxos[2].output.amount[0], poolUtxo.output.amount[0],
         { unit: stUnit, quantity: String(15000000) }
     ])
+    // // order output 0
+    // .txOut(wallet1Address, [
+    //     batchingOrderUtxos[0].output.amount[0], poolUtxo.output.amount[0],
+    //     { unit: poolAssetUnit, quantity: String(7000000) }
+    // ])
+    // // order output 1
+    // .txOut(wallet1Address, [
+    //     batchingOrderUtxos[1].output.amount[0], poolUtxo.output.amount[0],
+    //     { unit: stUnit, quantity: String(15000000) }
+    // ])
+    // // order output 2
+    // .txOut(wallet1Address, [
+    //     batchingOrderUtxos[2].output.amount[0], poolUtxo.output.amount[0],
+    //     { unit: stUnit, quantity: String(15000000) }
+    // ])
     // protocol parameters reference input
     .readOnlyTxInReference(pParamsUtxo.input.txHash, pParamsUtxo.input.outputIndex)
     .txInCollateral(
@@ -165,7 +183,8 @@ const unsignedTx = await txBuilder
     .changeAddress(wallet1Address)
     .selectUtxosFrom(wallet1Utxos)
     .requiredSignerHash(wallet1VK)
-    .setFee("5101297")
+    .setFee("1991297")
+    // .setFee("5991297")
     .complete()
 
 const signedTx = await wallet1.signTx(unsignedTx);

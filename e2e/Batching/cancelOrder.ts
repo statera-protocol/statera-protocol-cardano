@@ -11,8 +11,8 @@ const orderDatum = deserializeDatum<OrderDatumType>(orderPlutusData);
 
 const orderCanceller = orderDatum.fields[2].bytes;
 const orderAddress = serializeAddressObj(orderDatum.fields[1]);
-console.log("orderAddress:", orderAddress);
-console.log("orderCanceller:", orderCanceller);
+// console.log("orderAddress:", orderAddress);
+// console.log("orderCanceller:", orderCanceller);
 
 const unsignedTx = await txBuilder
   .withdrawalPlutusScriptV3()

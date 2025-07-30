@@ -4,7 +4,7 @@ import { UnifiedControlValidatorHash } from "../UnifiedControl/validator.js";
 
 // Pool
 const PoolValidator = blueprint.validators.filter(v => 
-    v.title.includes("pool_validators.pool_validator.spend")
+    v.title.includes("pool_validators.pool_validator.mint")
 );
 
 const PoolValidatorScript = applyParamsToScript(

@@ -70,7 +70,7 @@ const unsignedTx = await txBuilder
     )
     .changeAddress(wallet1Address)
     .selectUtxosFrom(wallet1Utxos)
-    .setFee("680441")
+    .setFee("1185645")
     .complete()
 
 const signedTx1 = await wallet1.signTx(unsignedTx, true);

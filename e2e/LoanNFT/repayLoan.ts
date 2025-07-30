@@ -1,14 +1,11 @@
-import { applyParamsToScript, builtinByteString, deserializeDatum, mConStr, mConStr0, mConStr1, mConStr3, outputReference } from "@meshsdk/core";
+import { applyCborEncoding, applyParamsToScript, builtinByteString, deserializeDatum, mConStr, mConStr0, mConStr1, mConStr3, outputReference, resolveScriptHash, serializePlutusScript } from "@meshsdk/core";
 import { CollateralValidatorAddr, CollateralValidatorHash, CollateralValidatorScript, identifierTokenUnit } from "../CollateralValidator/validator.js";
-import { blockchainProvider, StStableAssetName, txBuilder, wallet1, wallet1Address, wallet1Collateral, wallet1Utxos, wallet1VK } from "../setup.js";
+import { blockchainProvider, collateralScriptIdx, collateralScriptTxHash, mintStScriptTxHash, mintStScriptTxIdx, StStableAssetName, txBuilder, wallet1, wallet1Address, wallet1Collateral, wallet1Utxos, wallet1VK } from "../setup.js";
 import { CollateralDatum } from "../types.js";
 import { getLoanPositionDetails, getUserDepositUtxo } from "../utils.js";
 import { UnifiedControlValidatorHash } from "../UnifiedControl/validator.js";
 import { LoanNftValidator } from "./validator.js";
 import { MintStPolicy, MintStValidatorScript } from "../StMinting/validator.js";
-
-const collateralValScriptTxHash = "91405b0186ac0632690a5fcef34d971c8a71c9c4168d2f36662a42846776c766";
-const collateralValScriptTxIndex = 0;
 
 const allCollateralValidatorUtxos = await blockchainProvider.fetchAddressUTxOs(CollateralValidatorAddr);
 const collateralUtxos = allCollateralValidatorUtxos.filter(utxo => {
@@ -47,8 +44,8 @@ if (userLoanNFTUnit == "") {
 if (!loanNftUtxo) {
     throw new Error("Loan NFT UTxO not found");
 }
-// console.log("loanNftUtxo:", loanNftUtxo);
-// console.log("userLoanNFTUnit:", userLoanNFTUnit);
+console.log("loanNftUtxo amount:", loanNftUtxo.output.amount);
+console.log("userLoanNFTUnit:", userLoanNFTUnit);
 // console.log("collateralUtxo:", collateralUtxo);
 
 // Get loan NFT asset details
@@ -63,15 +60,17 @@ const txData = await blockchainProvider.get(
 // Get the utxo to use to reconstruct the loanNftValidatorScript
 const LnvsUtxo = (txData.data.inputs.filter((input: any) => (
     input.address == CollateralValidatorAddr
-)))[0]
+)))[0];
 if (!LnvsUtxo) {
     throw new Error("LnvsUtxo not found");
 }
-console.log("CollateralValidatorAddr:", CollateralValidatorAddr);
-console.log("txData:", txData);
-console.log("txData Input:", LnvsUtxo);
+// console.log("CollateralValidatorAddr:", CollateralValidatorAddr);
+// console.log("loanNFTTxHash:", loanNFTTxHash);
+// console.log("txData:", txData);
+// console.log("txData Input:", LnvsUtxo);
 // Reconstruct the loanNftValidatorScript
 const paramUtxo = outputReference(LnvsUtxo.tx_hash, LnvsUtxo.index);
+console.log("paramUtxo:", paramUtxo);
 const recLoanNftValidatorScript = applyParamsToScript(
   LoanNftValidator[0].compiledCode,
   [
@@ -81,6 +80,7 @@ const recLoanNftValidatorScript = applyParamsToScript(
   ],
   "JSON"
 );
+// console.log("recLoanNftValidatorScript hash:", resolveScriptHash(recLoanNftValidatorScript, "V3"));
 
 const userBalanceDatum = mConStr1([
     wallet1VK,
@@ -91,13 +91,6 @@ const userDepositUtxo = getUserDepositUtxo();
 const userBalanceUpdated = Number(userDepositUtxo.output.amount[0].quantity) + Number(collateralUtxo.output.amount[0].quantity);
 
 const unsignedTx = await txBuilder
-    // loan NFT input from user's wallet
-    .txIn(
-        loanNftUtxo.input.txHash,
-        loanNftUtxo.input.outputIndex,
-        loanNftUtxo.output.amount,
-        loanNftUtxo.output.address,
-    )
     // user's balance utxo in the protocol
     .spendingPlutusScriptV3()
     .txIn(
@@ -106,10 +99,10 @@ const unsignedTx = await txBuilder
         userDepositUtxo.output.amount,
         userDepositUtxo.output.address,
     )
-    .spendingTxInReference(collateralValScriptTxHash, collateralValScriptTxIndex)
+    .spendingTxInReference(collateralScriptTxHash, collateralScriptIdx)
     // .txInScript(CollateralValidatorScript)
     .spendingReferenceTxInInlineDatumPresent()
-    .spendingReferenceTxInRedeemerValue(mConStr(4, []))
+    .spendingReferenceTxInRedeemerValue(mConStr0([]))
     // collateral utxo containing the collateral the user locked
     .spendingPlutusScriptV3()
     .txIn(
@@ -118,23 +111,27 @@ const unsignedTx = await txBuilder
         collateralUtxo.output.amount,
         collateralUtxo.output.address,
     )
-    .spendingTxInReference(collateralValScriptTxHash, collateralValScriptTxIndex)
+    .spendingTxInReference(collateralScriptTxHash, collateralScriptIdx)
     // .txInScript(CollateralValidatorScript)
     .spendingReferenceTxInInlineDatumPresent()
-    .spendingReferenceTxInRedeemerValue(mConStr0([]))
+    .spendingReferenceTxInRedeemerValue(mConStr(6, []))
     // burns the loan NFT
     .mintPlutusScriptV3()
     .mint("-1", userLoanNFTUnit.slice(0, 56), userLoanNFTUnit.slice(56))
+    // .mintTxInReference(recLoanNftValidatorTxHash, recLoanNftValidatorTxIdx)
     .mintingScript(recLoanNftValidatorScript)
     .mintRedeemerValue(mConStr1([]))
     // burns the loan tokens (stable coin)
     .mintPlutusScriptV3()
     .mint("-".concat(String(st_borrowed)), MintStPolicy, StStableAssetName)
-    // .mintTxInReference(mintLoanScriptTxHash, mintLoanScriptTxIndex)
+    // .mintTxInReference(mintStScriptTxHash, mintStScriptTxIdx)
     .mintingScript(MintStValidatorScript)
     .mintRedeemerValue(mConStr1([]))
     // send updated user balance (with the unlocked collateral amount)
-    .txOut(CollateralValidatorAddr, [{ unit: "lovelace", quantity: String(userBalanceUpdated) }, { unit: identifierTokenUnit, quantity: "1" }])
+    .txOut(CollateralValidatorAddr, [
+        { unit: "lovelace", quantity: String(userBalanceUpdated) },
+        { unit: identifierTokenUnit, quantity: "1" },
+    ])
     .txOutInlineDatumValue(userBalanceDatum)
     .txInCollateral(
         wallet1Collateral.input.txHash,
