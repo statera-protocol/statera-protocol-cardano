@@ -48,8 +48,8 @@ const wallet1 = new MeshWallet({
 const wallet1Address = await wallet1.getChangeAddress();
 
 const wallet1Utxos = await wallet1.getUtxos();
-const wallet1Collateral: UTxO = (await blockchainProvider.fetchUTxOs("5d69f9d07b31dc6562c0cc9967edc78cf46f76a417f03b235a664b02797731dd", 1))[0]
-// const wallet1Collateral: UTxO = (await wallet1.getCollateral())[0]
+// const wallet1Collateral: UTxO = (await blockchainProvider.fetchUTxOs("5d69f9d07b31dc6562c0cc9967edc78cf46f76a417f03b235a664b02797731dd", 1))[0]
+const wallet1Collateral: UTxO = (await wallet1.getCollateral())[0]
 if (!wallet1Collateral) {
     throw new Error('No collateral utxo found');
 }
