@@ -39,7 +39,7 @@ import { cancelOrder } from '../../utils/Batching/cancelOrder';
 
 function Home() {
   const {
-    address, connected, balance, disconnect, walletVK, walletSK,
+    address, connected, balance, disconnect, walletVK, walletSK, handleWallet,
     txBuilder, wallet, walletCollateral, walletUtxos, blockchainProvider, refreshWalletState,
   } = useWalletCustom();
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -52,10 +52,10 @@ function Home() {
 
   // Mock data - in real app this would come from Cardano blockchain
   const [userPosition, setUserPosition] = useState<UserPosition>({
-    totalDeposit: 500.0,
-    totalCollateral: 750.0,
-    mintedST: 450.0,
-    healthFactor: 2.1,
+    totalDeposit: 0.0,
+    totalCollateral: 0.0,
+    mintedST: 0.0,
+    healthFactor: 0.0,
   });
 
   const [protocolStats, setProtocolStats] = useState<ProtocolStats>({
@@ -191,7 +191,8 @@ function Home() {
   useEffect(() => {
     (async () => {
       if (connected) {
-        await refreshWalletState();
+        refreshWalletState();
+        // await handleWallet();
 
         // get user deposit ADA balance
         const userDepositUtxo = await getUserDepositUtxo(walletVK);
@@ -201,14 +202,6 @@ function Home() {
         // get other user balances
         const { iUSDBalance, USDMBalance, STBalance, } = await getUserBalances(wallet);
 
-        // get user swap orders
-        const swapOrders = await getUserSwapOrders(address);
-
-        // udate user total deposit
-        setUserPosition(prev => ({
-          ...prev,
-          totalDeposit: userDepositUtxoAda,
-        }));
         // update user balances
         setUserBalances(prev => ({
           ...prev,
@@ -219,13 +212,29 @@ function Home() {
         }));
         // update user loan positions
         const userLoanPositions = await getUserLoanUtxos(walletUtxos);
-        setLoanPositions(prev =>
-          Array.from(new Map([...prev, ...userLoanPositions].map(p => [p.id, p])).values())
-        );
+        setLoanPositions(userLoanPositions);
         // update user swap orders
-        setSwapOrders(prev =>
-          Array.from(new Map([...prev, ...swapOrders].map(p => [p.id, p])).values())
-        ); 
+        const swapOrders = await getUserSwapOrders(address);
+        setSwapOrders(swapOrders);
+
+        let totalCollateral = 0.00;
+        let totalMintedSt = 0.00;
+        let averageLoanHealth = 0.00;
+
+        for (let i = 0; i < userLoanPositions.length; i++) {
+          totalCollateral += userLoanPositions[i].collateralAmount;
+          totalMintedSt += userLoanPositions[i].mintedST;
+          averageLoanHealth += userLoanPositions[i].healthFactor;
+        }
+        averageLoanHealth /= userLoanPositions.length;
+
+        // udate user total deposit
+        setUserPosition(({
+          totalDeposit: userDepositUtxoAda,
+          totalCollateral,
+          mintedST: totalMintedSt,
+          healthFactor: averageLoanHealth,
+        }));
 
         // Set the admin tab visibility
         setIsAdmin(adminWallets.includes(address));
@@ -262,6 +271,7 @@ function Home() {
       txBuilder.reset();
       setIsProcessing({ bool: false, action: 'deposit', });
       console.log("handleNewDeposit error:", err);
+      return;
     }
 
     blockchainProvider.onTxConfirmed(txHash, () => {
@@ -293,6 +303,7 @@ function Home() {
       txBuilder.reset();
       setIsProcessing({ bool: false, action: 'deposit', });
       console.log("handleIncreaseDeposit error:", err);
+      return;
     }
 
     blockchainProvider.onTxConfirmed(txHash, () => {
@@ -324,6 +335,7 @@ function Home() {
       txBuilder.reset();
       setIsProcessing({ bool: false, action: 'deposit', });
       console.log("handleWithdrawDeposit error:", err);
+      return;
     }
 
     blockchainProvider.onTxConfirmed(txHash, () => {
@@ -375,6 +387,7 @@ function Home() {
       txBuilder.reset();
       setIsProcessing({ bool: false, action: 'deposit', });
       console.log("handleCloseAccount error:", err);
+      return;
     }
 
     blockchainProvider.onTxConfirmed(txHash, () => {
@@ -410,6 +423,7 @@ function Home() {
       txBuilder.reset();
       setIsProcessing({ bool: false, action: 'loan', });
       console.log("handleCreateLoan error:", err);
+      return;
     }
 
     blockchainProvider.onTxConfirmed(txHash, () => {
@@ -523,6 +537,7 @@ function Home() {
       txBuilder.reset();
       setIsProcessing({ bool: false, action: 'loan', });
       console.log("handleIncreaseCollateral error:", err);
+      return;
     }
 
     blockchainProvider.onTxConfirmed(txHash, () => {
@@ -557,6 +572,7 @@ function Home() {
       txBuilder.reset();
       setIsProcessing({ bool: false, action: 'loan', });
       console.log("handleReduceCollateral error:", err);
+      return;
     }
 
     blockchainProvider.onTxConfirmed(txHash, () => {
@@ -590,6 +606,7 @@ function Home() {
       txBuilder.reset();
       setIsProcessing({ bool: false, action: 'loan', });
       console.log("handlePartialRepayLoan error:", err);
+      return;
     }
 
     blockchainProvider.onTxConfirmed(txHash, () => {
@@ -628,6 +645,7 @@ function Home() {
       txBuilder.reset();
       setIsProcessing({ bool: false, action: 'loan', });
       console.log("handleFullRepayLoan error:", err);
+      return;
     }
 
     blockchainProvider.onTxConfirmed(txHash, () => {
@@ -765,6 +783,7 @@ function Home() {
       txBuilder.reset();
       setIsProcessing({ bool: false, action: 'swap', });
       console.log("Create buy order:", txHash);
+      return;
     }
 
     blockchainProvider.onTxConfirmed(txHash, () => {
@@ -796,6 +815,7 @@ function Home() {
       txBuilder.reset();
       setIsProcessing({ bool: false, action: 'swap', });
       console.log("Create sell order:", txHash);
+      return;
     }
 
     blockchainProvider.onTxConfirmed(txHash, () => {
@@ -828,6 +848,7 @@ function Home() {
       txBuilder.reset();
       setIsProcessing({ bool: false, action: 'swap', });
       console.log("Cancel order:", txHash);
+      return;
     }
 
     blockchainProvider.onTxConfirmed(txHash, () => {

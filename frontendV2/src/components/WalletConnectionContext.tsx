@@ -20,6 +20,7 @@ interface WalletContextType {
   refreshWalletState: () => void;
   connect: (walletName: string, extensions?: number[], persist?: boolean) => Promise<void>;
   disconnect: () => void;
+  handleWallet: () => Promise<void>
 }
 
 // Create the context
@@ -39,68 +40,68 @@ export function WalletConnectionProvider({ children }: { children: ReactNode }) 
   const [walletReady, setWalletReady] = useState<boolean>(false);
   const [refreshWallet, setRefreshWallet] = useState<boolean>(false);
 
-  useEffect(() => {
-    const handleWallet = async () => {
-      setWalletReady(false);
+  const handleWallet = async () => {
+    setWalletReady(false);
 
-      const maestroKey = process.env.NEXT_PUBLIC_MAESTRO_KEY;
-      if (!maestroKey) {
-        throw new Error("MAESTRO_KEY does not exist");
-      }
+    const maestroKey = process.env.NEXT_PUBLIC_MAESTRO_KEY;
+    if (!maestroKey) {
+      throw new Error("MAESTRO_KEY does not exist");
+    }
 
-      const bp = new MaestroProvider({
-        network: 'Preprod',
-        apiKey: maestroKey,
-      });
-      const tb = new MeshTxBuilder({
-        fetcher: bp,
-        submitter: bp,
-        evaluator: bp,
-        verbose: false,
-      });
-      tb.setNetwork('preprod');
+    const bp = new MaestroProvider({
+      network: 'Preprod',
+      apiKey: maestroKey,
+    });
+    const tb = new MeshTxBuilder({
+      fetcher: bp,
+      submitter: bp,
+      evaluator: bp,
+      verbose: false,
+    });
+    tb.setNetwork('preprod');
 
-      setTxBuilder(tb);
-      setBlockchainProvider(bp);
+    setTxBuilder(tb);
+    setBlockchainProvider(bp);
 
-      if (connected && wallet) {
-        try {
-          const walletAddress = await wallet.getChangeAddress();
-          const balance = await wallet.getBalance();
-          const { pubKeyHash: walletVK, stakeCredentialHash: walletSK } = deserializeAddress(walletAddress);
+    if (connected && wallet) {
+      try {
+        const walletAddress = await wallet.getChangeAddress();
+        const balance = await wallet.getBalance();
+        const { pubKeyHash: walletVK, stakeCredentialHash: walletSK } = deserializeAddress(walletAddress);
 
-          const fetchedWalletUtxos = await wallet.getUtxos();
-          const fetchedWalletCollateral: UTxO[] = await wallet.getCollateral();
+        const fetchedWalletUtxos = await wallet.getUtxos();
+        const fetchedWalletCollateral: UTxO[] = await wallet.getCollateral();
 
-          setAddress(walletAddress);
-          setBalance(balance);
-          setWalletVK(walletVK);
-          setWalletSK(walletSK);
-          setWalletUtxos(fetchedWalletUtxos);
-          setWalletCollateral(fetchedWalletCollateral[0] || null);
+        setAddress(walletAddress);
+        setBalance(balance);
+        setWalletVK(walletVK);
+        setWalletSK(walletSK);
+        setWalletUtxos(fetchedWalletUtxos);
+        setWalletCollateral(fetchedWalletCollateral[0] || null);
 
-          setWalletReady(true);
-        } catch (err) {
-          console.error("Error setting up wallet state:", err);
-          setWalletReady(false);
-          setAddress("");
-          setBalance([]);
-          setWalletVK("");
-          setWalletSK("");
-          setWalletUtxos([]);
-          setWalletCollateral(null);
-        }
-      } else {
+        setWalletReady(true);
+      } catch (err) {
+        console.error("Error setting up wallet state:", err);
+        setWalletReady(false);
         setAddress("");
         setBalance([]);
         setWalletVK("");
         setWalletSK("");
         setWalletUtxos([]);
         setWalletCollateral(null);
-        setWalletReady(false);
       }
-    };
+    } else {
+      setAddress("");
+      setBalance([]);
+      setWalletVK("");
+      setWalletSK("");
+      setWalletUtxos([]);
+      setWalletCollateral(null);
+      setWalletReady(false);
+    }
+  };
 
+  useEffect(() => {
     handleWallet();
   }, [connected, wallet, refreshWallet]);
 
@@ -128,6 +129,7 @@ export function WalletConnectionProvider({ children }: { children: ReactNode }) 
         refreshWalletState,
         connect,
         disconnect,
+        handleWallet,
       }}
     >
       {children}

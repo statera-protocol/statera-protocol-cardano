@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Shield, Coins, AlertTriangle, Plus, Minus, Edit3, Trash2 } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Shield, Coins, AlertTriangle, Plus, Minus, Edit3, Trash2, Loader2 } from 'lucide-react';
 import { CollateralToken, LoanPosition, ProcessingState } from '../types';
 
 interface CollateralModuleProps {
@@ -35,14 +35,23 @@ const CollateralModule: React.FC<CollateralModuleProps> = ({
 
   const loanIsProcessing = isProcessing.bool && isProcessing.action == 'loan';
 
+  useEffect(() => {
+    if (!loanIsProcessing && selectedLoan) {
+      setAmount('');
+      setAction(null);
+      setSelectedLoan(null);
+    }
+    if (!loanIsProcessing && newLoan.token) {
+      setNewLoan({ token: '', collateralAmount: '', mintAmount: '' });
+      setShowCreateLoan(false);
+    }
+  }, [loanIsProcessing]);
+
   const handleCreateLoan = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newLoan.token || !newLoan.collateralAmount || !newLoan.mintAmount) return;
 
     onCreateLoan(newLoan.token, parseFloat(newLoan.collateralAmount), parseFloat(newLoan.mintAmount));
-
-    setNewLoan({ token: '', collateralAmount: '', mintAmount: '' });
-    setShowCreateLoan(false);
   };
 
   // Validation function for create loan button
@@ -69,9 +78,6 @@ const CollateralModule: React.FC<CollateralModuleProps> = ({
     if (!selectedLoan || !action) return;
 
     onModifyLoan(selectedLoan, action, parseFloat(amount));
-    setAmount('');
-    setAction(null);
-    setSelectedLoan(null);
   };
 
   const getHealthFactorColor = (factor: number) => {
@@ -95,7 +101,7 @@ const CollateralModule: React.FC<CollateralModuleProps> = ({
           <button
             onClick={() => setShowCreateLoan(true)}
             disabled={loanIsProcessing}
-            className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+            className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed disabled:hover:bg-blue-400"
           >
             <Plus className="w-4 h-4" />
             <span>Create Loan</span>
@@ -144,7 +150,10 @@ const CollateralModule: React.FC<CollateralModuleProps> = ({
                       onClick={() => setSelectedLoan(loan.id)}
                       className="p-2 text-gray-400 hover:text-blue-400 hover:bg-gray-700 rounded-lg transition-colors"
                     >
-                      <Edit3 className="w-4 h-4" />
+                      {(loanIsProcessing && selectedLoan === loan.id) ?
+                        <Loader2 className="w-4 h-4 animate-spin" /> :
+                        <Edit3 className="w-4 h-4" />
+                      }
                     </button>
                   </div>
                 </div>
@@ -190,7 +199,7 @@ const CollateralModule: React.FC<CollateralModuleProps> = ({
           <button
             onClick={() => setShowCreateLoan(true)}
             disabled={loanIsProcessing}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors disabled:bg-blue-400 disabled:cursor-not-allowed disabled:hover:bg-blue-400"
           >
             {loanIsProcessing ? 'Processing...' : 'Create Loan'}
           </button>
@@ -265,11 +274,12 @@ const CollateralModule: React.FC<CollateralModuleProps> = ({
               <div className="flex space-x-3 pt-4">
                 <button
                   type="button"
+                  disabled={loanIsProcessing}
                   onClick={() => {
                     setShowCreateLoan(false);
                     setNewLoan({ token: '', collateralAmount: '', mintAmount: '' });
                   }}
-                  className="flex-1 py-2 px-4 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                  className="flex-1 py-2 px-4 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors disabled:bg-gray-400 disabled:text-gray-200 disabled:cursor-not-allowed disabled:hover:bg-gray-400"
                 >
                   Cancel
                 </button>
@@ -325,8 +335,9 @@ const CollateralModule: React.FC<CollateralModuleProps> = ({
                   <span>Full Repayment</span>
                 </button>
                 <button
+                  disabled={loanIsProcessing}
                   onClick={() => setSelectedLoan(null)}
-                  className="w-full py-2 px-4 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                  className="w-full py-2 px-4 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors disabled:bg-gray-400 disabled:text-gray-200 disabled:cursor-not-allowed disabled:hover:bg-gray-400"
                 >
                   Cancel
                 </button>
@@ -369,11 +380,12 @@ const CollateralModule: React.FC<CollateralModuleProps> = ({
                 <div className="flex space-x-3">
                   <button
                     type="button"
+                    disabled={loanIsProcessing}
                     onClick={() => {
                       setAction(null);
                       setAmount('');
                     }}
-                    className="flex-1 py-2 px-4 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                    className="flex-1 py-2 px-4 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors disabled:bg-gray-400 disabled:text-gray-200 disabled:cursor-not-allowed disabled:hover:bg-gray-400"
                   >
                     Back
                   </button>

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { ArrowUpDown, ArrowRight, AlertTriangle, Clock, X } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { ArrowUpDown, ArrowRight, AlertTriangle, Clock, X, Loader2 } from 'lucide-react';
 import { ProcessingState, SwapOrder } from '../types';
 
 interface SwapPair {
@@ -32,8 +32,15 @@ export default function SwapModule({
   const [fromToken, setFromToken] = useState('USDM');
   const [toToken, setToToken] = useState('ST');
   const [amount, setAmount] = useState('');
+  const [cancelOrderId, setCancelOrderId] = useState('');
 
   const swapIsProcessing = isProcessing.bool && isProcessing.action === 'swap';
+
+  useEffect(() => {
+    if (!swapIsProcessing && cancelOrderId) {
+      setCancelOrderId('');
+    }
+  }, [swapIsProcessing, cancelOrderId]);
   
   const currentPair = swapPairs.find(pair => 
     pair.from === fromToken && pair.to === toToken
@@ -152,10 +159,10 @@ export default function SwapModule({
         {/* Swap Button */}
         <button
           onClick={handleSwap}
-          disabled={!amount || parseFloat(amount) <= 0 || !currentPair}
+          disabled={!amount || parseFloat(amount) <= 0 || !currentPair || swapIsProcessing}
           className="w-full mt-6 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2"
         >
-          {swapIsProcessing ? 'Processing...' :
+          {(swapIsProcessing && !cancelOrderId) ? 'Processing...' :
             <>
               <ArrowRight className="w-4 h-4" />
               <span>Swap Tokens</span>
@@ -189,11 +196,17 @@ export default function SwapModule({
                           Pending
                         </span>
                         <button
-                          onClick={() => onCancelSwap(order.id)}
+                          onClick={() => {
+                            setCancelOrderId(order.id);
+                            onCancelSwap(order.id);
+                          }}
                           className="p-1 text-gray-400 hover:text-red-400 hover:bg-gray-600 rounded transition-colors"
                           title="Cancel Order"
                         >
-                          <X className="w-4 h-4" />
+                          {(swapIsProcessing && cancelOrderId === order.id) ?
+                            <Loader2 className="w-4 h-4 animate-spin" /> :
+                            <X className="w-4 h-4" />
+                          }
                         </button>
                       </div>
                     </div>

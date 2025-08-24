@@ -132,7 +132,7 @@ const Dashboard: React.FC<DashboardProps> = ({ position, transactions, protocolS
               <p className="text-sm text-gray-400">Health Factor</p>
               <p className="text-2xl font-bold text-white">{position.healthFactor.toFixed(2)}</p>
               <div className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${getHealthFactorColor(position.healthFactor)}`}>
-                {position.healthFactor >= 2 ? 'Safe' : position.healthFactor >= 1.5 ? 'Moderate' : 'Risk'}
+                {position.healthFactor >= 2 ? 'Safe' : position.healthFactor >= 1.5 ? 'Moderate' : position.healthFactor < 1.5 ? 'Risk' : ''}
               </div>
             </div>
             <div className="w-10 h-10 bg-orange-900/20 rounded-full flex items-center justify-center">
