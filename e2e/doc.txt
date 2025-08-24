@@ -1,0 +1,215 @@
+Create parameters tx hash: b5022c38bad776828ab2f44c4eea06b7c7296086f948d9c88ca61f0e8ca53c91
+Create pool: 03c9431ccd34bf916167ec6be28127de4da237c00e8fc09fc34389be06baddf1
+Create buy order: 0d2227766acdf46b9a81e7997e7c3829f1e52ac2c82e25a69301ade1b2881dfa
+Pool batching: c41188b0474b1653572144c18016dcb0e51bd184ea6e36c8ab2eb0ded533b898
+
+Create sell order: 60aee3784f92cea0499ca577749026d22ce36123655698f6e4370fbe0a397021
+Create buy order: 84afc9b5ce4b70d28866ed3e84c04da5ce6bbac4c72d591daf2c8c83c46a4b03
+Create buy order: 0cb7bd5fbbf20e26a5dfbe397236deac36c4b0926d63ef023ad774a1637e872b
+Pool batching: 7dd1fd208d48acdda262b08048fa103c5a61c492a33545b47894e7e9eb6ea5f5
+
+
+- protocol parameters ///
+- register stake script certs ///
+- batching ref script ///
+- collateral not enough ///
+- order utxos ///
+- pool utxo ///
+
+Create parameters tx hash: 55d0930e1906486359c960c56d33f1d8d95c54bebecfb0d7cb40e6e053fba99d
+Create buy order: 16520b7194a19ae74a64675836edbadfb64628be01ba48d75573d51e2892abfb
+Create pool: 48d4e7208a2aa4e1196e88f993f80e40dafe46a6897a2e469801258515f108c7
+
+
+ADMIN MODULE:
+----------------------------------------------------------------------------------------------------------
+Create parameters tx hash: f63cd5a2f44252a6dff5383b13e1797abbd4156ffc9c609d8c4cd63fcf14e367
+Create oracle tx hash: 9a741c47651a262afc73d6e8068af53f47be9f75238312175bc29e2589da9dfa
+Create liquidation address tx hash: 70464883edf3ad6c06ab1b87090c6a2a95c6b38c0310f030acc3d747bce0ee19
+----------------------------------------------------------------------------------------------------------
+Update Protocol Parameters tx hash: 6c01f05aa11a3787cc41e2f386635de53728209b6c8f0dbc2f7c619c17e084da
+Update Oracle tx hash: a77c2b1cdd2bf653ca790dab687b33eee71b3718c63d60185882b1e1ad9d784e
+Update Liquidation Address tx hash: 8fd8ee501712c3c2db5ac5c627288c9cf705217f86a9238596eeecbf760ef9b2
+----------------------------------------------------------------------------------------------------------
+Delete Parameters tx hash: 9416f2d948eb5613660a48dbfbc378f6c74465a29e33b7f396d6d1c00900d4cd
+Delete Oracle tx hash: fa7e4d1583392d49205c7f0e835dae94ed482629c551eea457b5d3ee5fdba712
+Delete Liquidation Address tx hash: d6b8f38f5f3df5690dcfe730a16ddea525231f66c4eca9c8d707ee2e8c23adf4
+
+
+BALANCE MODULE:
+----------------------------------------------------------------------------------------------------------
+New balance txHash: feae713d5f02ab196422df097e40a1a248c2fdc585b004f065263fd5b7028fca
+Increase balance txHash: 29699e16b1736e581e70fef2050ede4fe92e8c3997d2847a8e8e643ed5a3490e
+reduce balance txHash: 606cd4bef46b6007aef5c6bf32a811d1139a1fa736aed2219f1f790be7ddec6c
+(the balance went through series of transactions (e.g. "Increase collateral" before final withdraw All))
+Withdraw all balance txHash: 0b54a75566f563d2c9c845f210237e54613cfdcb6ae53179151e3fa1aade54f3
+
+
+LOAN MODULE:
+----------------------------------------------------------------------------------------------------------
+take loan txHash: 1a3c4ff87acdb469262bad8b4395b40b1d872353ea7aa26023dcbb13db6d5de3
+Increase collateral txHash: b56c8d4b0af67a8739b0d479e80cf3c2d0c0022b71554ac8accecdf42ba9db84
+Reduce collateral txHash: 0809f8d6793ae396e0a64a0b5dfe3960cd15560c14776cda8800ad0704f8c60d
+Partial repay loan txHash: 7a3a86a0b67b9a06a82eecf55764b35b607ba99852dc4715325a65ec40087754
+Repayment tx hash: cdf4c7d0efa80cb3535561a3a6d2cd170d5cc9cff8c5c5ede48930e035fd1109
+----------------------------------------------------------------------------------------------------------
+take loan txHash: 11e0bd366942222d4116131bfa5c9d1182219055e92e1e7227959eafcefe61bb
+(updated the oracle rate before liquidation)
+Liquidation tx hash: ae1e8317e85801ad1e3679589552640f5b578be4fd3ae16c74a979b7ace0d295
+
+
+POOL BATCHING MODULE:
+----------------------------------------------------------------------------------------------------------
+Create buy order: 0b39f07565104d6aff3e6a1c3796885860543c5e72651e9bae245be9d6751125
+Cancel order: 4a72e00c20ee95d241f90a30c7e5ce6a78cce8abb603ff3c5cff579c78b97000 (Buy)
+Create sell order: 6ece40b75ff8ba82e5d8232a7bce0fede0fa7fad4f13fb05746925f5f56b2198
+Cancel order: dc06bb06be565428eae2fd266c8ac6b37507d10a3664ce245c997c4dd208d592 (Sell)
+----------------------------------------------------------------------------------------------------------
+Create sell order: a2b3bc8c55832ae402034ca2b42843d3945f3f3006e02d8cc04d18bec9688a9d
+Create buy order: faf209d61ac5b38afc2d78cd8c33334eb3408fb6c9878cbf5908fdcda0c959dd
+Create buy order: cb290e4cc166847ecb802e7bb19bba9c819c1b91e806487de37bb355e4ed5ee6
+Create pool: 64663c34dffa18100ee5280e34c175e7d560e025b844ec39e9cd754ad496cd59
+
+
+MISC:
+----------------------------------------------------------------------------------------------------------
+register all stake certificate tx hash: 761a838d61b8637eb254caed20e77aaff78ad49db08642f28dd5f6913bf94f1b
+Save collateral script: a06509e429311b9940d3a685b91218755397de2510e297b0308427aa3edf8170
+Save mint st script: 9a92b88a1bfcd36cf24d653a3038693b40e27e74d0cc326634bf1dc06acfcccd
+Save batching script: c92184a50e4f5d63c7105c193210fe03e921f6cf6dfd99fcaf3bf660c52c5453
+
+
+
+
+
+
+
+
+
+
+""""""""""""""""""""""""""""""""""""""""""""""""""
+ARCHIVE 2
+""""""""""""""""""""""""""""""""""""""""""""""""""
+
+ADMIN MODULE:
+----------------------------------------------------------------------------------------------------------
+Create parameters tx hash: 3227c47b42269ad05e8df4a8aa67502a01ef922687ef7fdf109b2cbf636b22dd
+Create oracle tx hash: fb50d5d7b8fb96c124a01abe989fad3511e8962fbd2bd4259d84ce7ecb2c622b
+Create liquidation address tx hash: 3fa410ad248c0c461c2d0eb01431fd0a2d6229164abcb649d4f4c7de942d9bb5
+----------------------------------------------------------------------------------------------------------
+Update Protocol Parameters tx hash: 9cce68c867cb80d6f2857daadd6728f480627bc3826d6e5ae4d547bd695f2522
+Update Oracle tx hash: 2798ece21938a0fe1a0ebd580d0465ef047c3458069a5f4acdf7cca6977d3864
+Update Liquidation Address tx hash: 54ded1c2cd587221b2845c5800f6dacd446e0043e733adf829def8f3b0151f4a
+----------------------------------------------------------------------------------------------------------
+Delete Parameters tx hash: 0c46c1e3d2cea5d93274f48f63b72493322e81622b228a47698ddce9e4a13b2f
+Delete Oracle tx hash: 8e6ffbbb2a7d0f67d45ef61d8b9ea27570d7908bd4673149c05674440f2099bf
+Delete Liquidation Address tx hash: 9676dfe109973b3fd25675745e6f47813d71e421193e4ef9113f3075b01ec222
+
+
+BALANCE MODULE:
+----------------------------------------------------------------------------------------------------------
+Add balance txHash: b97073637ab426e08889c6e3c54477172e75e1c611af79a3779f60bccebef786
+Increase balance txHash: 130d4f3e0951441bd4a6c53bb3cd17687af21fccd03eb0517959d610df1b7ac1
+reduce balance txHash: 57efeddbff986f787c4142f1fca98af9061ba5663222fa47f966a13ae5fe305f
+withdraw balance txHash: 4dd5eb2f1af4eb4458fb7dee1e088987536b5c3419947d94f6dd340b87a1d474
+
+
+LOAN MODULE:
+----------------------------------------------------------------------------------------------------------
+take loan txHash: 43f5a9f9cdeeabfd46f0b38e505d9980176a6f50bcf1e860e149cba15c75cf1a
+Liquidation tx hash: 611ae8535f9f35750c129d0ad6fca3dee87c0cdeac3d97561cee5f2456420bc9
+----------------------------------------------------------------------------------------------------------
+take loan txHash: 665f9668f929f6a5487389fae0225bfc355316ecd462abe7b66de6676d35cc7d
+Increase collateral txHash: a77c832ffb740fe434b67bbae94f86267f9e292bd6606a92cc935315a5329d64
+Reduce collateral txHash: c23adf3787979207110534cac530a9cd1b3777ee1be5ac26805ac4a59922da38
+Partial repay loan txHash: 19e2701ce93875013b6a99c1fadbd8ea6c09502d3d145e56aa792960d07cd643
+----------------------------------------------------------------------------------------------------------
+take loan txHash: 91793cc000fbe89b9dce0a08696fc3a09516c5801e12efbc6bb917efbf323f45
+Repayment tx hash: 9d614400300976507a9a70f35402d78c6f1ad7a744831b57bd7c4ddcfbb11a6e
+----------------------------------------------------------------------------------------------------------
+take loan txHash: c83097db034241467b96cc40968365fe2e625906c36436c5563106958673fe4c
+Partial repay loan txHash: 5ba0d302fc3f9ab5e096efad968995796531d20000232640a819f7837fc44b0a
+Repayment tx hash: f4e749ee449129b1e07f4ab586be402de4baa91768798eb84ca623cc7b729d2c
+
+
+POOL BATCHING MODULE:
+----------------------------------------------------------------------------------------------------------
+Create order: f7b81d8a92ad5d2fd2ac3c7b490d2f8d34e96fedf562f713b5b32df21125a04a *
+Cancel order: 9c3530488613b8f372be7d0dc35cf64e407d6d3db487d630aa8727cf4ae40b1d *
+
+
+MISC:
+----------------------------------------------------------------------------------------------------------
+register all stake certificate tx hash: 761a838d61b8637eb254caed20e77aaff78ad49db08642f28dd5f6913bf94f1b
+Save collateral script: 6a2604c22ab4318e7b27755b0306c6a08899e59b57e9eedabefd4803f59b4821
+
+
+
+""""""""""""""""""""""""""""""""""""""""""""""""""
+(ARCHIVE) NON-VERBOSE: TESTING FOR PARTIAL REPAYMENT AND FULL REPAYMENT
+""""""""""""""""""""""""""""""""""""""""""""""""""
+Update Protocol Parameters tx hash: cb2bc1aa3f75c15cfe2f837a38b37f202a9982e89d52e04a05debda012a6ac23
+Add balance txHash: d5b1943d1ccf24db7b2955d0b252e6693e6cccdd9c0d2e2523fd5c1f2fad4281
+Save collateral script: e0228a56f48d5bde74dc4d81e9167e1a6b1e72c8e390a7032f06c6d7c76e26c4
+take loan txHash: 3cf16702f05f1e1cc4475d720dd98cb1baf784cc9fb053b744fe091e2621a06a
+Save mint st script: af56ece850f0fa618809d737664f9af0f68f6da6f13c3db21614055faff224ee
+Partial repay loan txHash: 7f9c5f104f8dc02343df5ab4b7733847fe73572dd256120c81cd8672fd43f8a0
+Repayment tx hash: 937ee60e194802aebd4de0397c48f3d755d0776883f76663948400adb2cd6d8a
+----------------------------------------------------------------------------------------------------------
+take loan txHash: 81470bf0a926fe70f6a00ad05f09e814b058497c242a7c169c75e01614181eb1
+
+
+
+""""""""""""""""""""""""""""""""""""""""""""""""""
+(ARCHIVE) VERBOSE: TESTING FOR PARTIAL REPAYMENT AND FULL REPAYMENT
+""""""""""""""""""""""""""""""""""""""""""""""""""
+Update Protocol Parameters tx hash: 50ca452938d3ade893e7e26ec02a69314256c49d14a0e944ad6608023f53ea51
+Add balance txHash: 019cd3ec0371f5b78203e68a98084e8c5f6741b1fe0b041a86485e56a810f51d
+Save collateral script: 4038efafb42494a8c29c2a46a0a7a09c76435ff4e84971821c12c4f992155af7
+take loan txHash: 1a6e1058357f11b23c62193d20c68848a7c41fb7c7c61dff7cda410ae118fa8e
+----------------------------------------------------------------------------------------------------------
+Update Protocol Parameters tx hash: 819459c33aa8ab9e064a46bbd5938d1af22b2eddc52672bdcd9dd061cd8d4963
+Add balance txHash: af145b9528b48ab34c52d118b419bc9c652dd973fc6a47d5a7f99fc295e85fb4
+Save collateral script: d08ab14c50ae0688488ebec1fd5c7f9504301bc66e1920459fb4e46a56f30c92
+take loan txHash: 2a71bcdb3e7b88e7085efdf8f4a6e41a76a614e927dd5b8663116c21c59f6af9
+
+
+
+""""""""""""""""""""""""""""""""""""""""""""""""""
+ARCHIVE 1
+""""""""""""""""""""""""""""""""""""""""""""""""""
+
+POOL BATCHING MODULE:
+----------------------------------------------------------------------------------------------------------
+Create pool: d030626d93c4e14510e67636b281db9eef7f00509fb97ac1e85cdf234d74e688
+----------------------------------------------------------------------------------------------------------
+Create order: 765d716194ddb5f6e2250351a151747b4d616642e367db91bd00cd682313b66b
+Pool batching: 8b106e8eee2d7648a82e8e66d37b647685bdaf240e7e8028624a5e894e53c31f
+----------------------------------------------------------------------------------------------------------
+Create order (1) Buy: 20144f9d801d4487a2ccad83235b8de815ab066457de7b9580afe36ebbc0ab31
+Create order (2) Sell: 6a440d03d7fcfc201b12f86fb012358ca10f8cdb6e10aeb6e351c10cec29608e
+Create order (3) Buy: 39d56b6fe0fc878846396045c7823033752e9a63b2185dfdd4485cf8d1745658
+Pool batching: c038289ac33921bafe948140fd99d2004dacfa8eca97fd0f0d481602801620d8
+
+
+BALANCE MODULE:
+----------------------------------------------------------------------------------------------------------
+Add balance txHash: 1f94b93b948a9e48c8b43fcc0859993a7bee34579f5a66be6b2daef235cbefb4
+Increase balance txHash: 4e778ace9f5cde9a7cb53ca62967027124027ab363bfa92c504f3e0269f612c6
+reduce balance txHash: 5624567affec65f0c06910eaa5c32f2d97f091df39cb1231528bd2a9de5416d5
+withdraw balance txHash: 1baf142c4ccffbc88026d5699afa9ab2334cbd3c5674e62b547af9b706e20109
+
+
+LOAN MODULE:
+----------------------------------------------------------------------------------------------------------
+take loan txHash: 5fcc86f59fb598a5aae60200b9a4e7aa4e9fb435f211408b9212be8f50401355
+Increase collateral txHash: ef4879c026ab3999c86cf9d467f12903bbcbe903ddea751f7bb8e3cf82698aba
+----------------------------------------------------------------------------------------------------------
+(used in loan module)
+Add balance txHash: 4d3ac9857149afc3f51d560462ea3cde83652c3c03480f6405dd8c8682c89d90
+
+
+ADMIN MODULE:
+----------------------------------------------------------------------------------------------------------
+Create parameters tx hash: 62e9dfbafa714614dd679b9f0a3fd4286b4635d62c19240867c396faa1ee3b6b
+Create oracle tx hash: 0211f4301faac228edd7a0b3d17f502d69f177fa3c8537a839bc0bc1bb5348f9

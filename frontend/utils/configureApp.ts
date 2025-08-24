@@ -1,8 +1,14 @@
-import { deserializeAddress, IWallet, MaestroProvider, MeshTxBuilder, UTxO } from "@meshsdk/core";
+import { BlockfrostProvider, deserializeAddress, IWallet, MaestroProvider, MeshTxBuilder, UTxO } from "@meshsdk/core";
 import { OfflineEvaluator } from "@meshsdk/core-csl";
 import { setup } from "./setup";
 
 export const configureApp = async (wallet: IWallet) => {
+  // Setup blockhain provider as Blockfrost
+  // const blockfrostId = process.env.NEXT_PUBLIC_BLOCKFROST_ID;
+  // if (!blockfrostId) {
+  //     throw new Error("BLOCKFROST_ID does not exist");
+  // }
+  // const blockchainProvider = new BlockfrostProvider(blockfrostId);
   // Setup blockhain provider as Maestro
   const maestroKey = process.env.NEXT_PUBLIC_MAESTRO_KEY;
   if (!maestroKey) {
