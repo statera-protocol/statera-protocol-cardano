@@ -1,10 +1,11 @@
-import { deserializeDatum, hexToBytes, hexToString, MaestroProvider, NativeScript, resolveNativeScriptHash, serializeNativeScript, UTxO } from "@meshsdk/core";
-import { CollateralDatum, DepositDatum, OracleDatum, ProtocolParametersDatum } from "./types";
+import { deserializeDatum, hexToBytes, hexToString, IWallet, MaestroProvider, NativeScript, resolveNativeScriptHash, serializeAddressObj, serializeNativeScript, toUTF8, UTxO } from "@meshsdk/core";
+import { CollateralDatum, DepositDatum, OracleDatum, OrderDatumType, ProtocolParametersDatum } from "./types";
 import { UnifiedControlValidatorAddr, UnifiedControlValidatorHash } from "./UnifiedControl/validator";
 import { CollateralValidatorAddr } from "./CollateralValidator/validator";
 import { setup } from "./setup";
 import { MintStPolicy } from "./StMinting/validator";
-import { LoanPosition } from "@/types";
+import { CollateralToken, LoanPosition, SwapOrder } from "@/types";
+import { OrderValidatorAddr } from "./Batching/validators";
 
 const maestroKey = process.env.NEXT_PUBLIC_MAESTRO_KEY;
 if (!maestroKey) {
@@ -76,17 +77,16 @@ const getUserLoanUtxos = async (walletUtxos: UTxO[]) => {
     let isNftInUserWallet = walletUtxos.find(utxo => utxo.output.amount.find(amt => amt.unit === loanNftUnit));
 
     if (isNftInUserWallet) {
-      const collateralToken = hexToString(datum.fields[6].fields[2].bytes) === 'lovelace' ? 'ada' : hexToString(datum.fields[6].fields[2].bytes);
+      const collateralToken = hexToString(datum.fields[6].fields[2].bytes) === 'lovelace' ? 'ADA' : hexToString(datum.fields[6].fields[2].bytes);
       const collateralTokenUnit = datum.fields[6].fields[1].bytes + datum.fields[6].fields[2].bytes;
-      let collateralAmount = collateralToken === 'ada' ? Number(utxo.output.amount[0].quantity) : (() => { const theAmt = utxo.output.amount.find(amt => amt.unit === collateralTokenUnit); return (Number(theAmt?.quantity) ?? 0) })();
+      let collateralAmount = collateralToken === 'ADA' ? Number(utxo.output.amount[0].quantity) : (() => { const theAmt = utxo.output.amount.find(amt => amt.unit === collateralTokenUnit); return (Number(theAmt?.quantity) ?? 0) })();
       collateralAmount /= 1000000;
       const mintedST = Number(datum.fields[2].int) / 1000000;
 
-      const [assetUsdRatePrecised, minCollateral] = getMinCollateral(mintedST, collateralTokenUnit);
-      const assetUsdRate = assetUsdRatePrecised / precisionFactor;
+      const assetUsdRate = Number(getAssetPrice(collateralTokenUnit));
       const collateralUsdAmount = collateralAmount * assetUsdRate;
-      // Using a mock Liquidation ratio of 0.8
-      const healthFactor = (collateralUsdAmount * 0.8) / mintedST;
+      const { minLiquidationThreshold } = getProtocolParamters();
+      const healthFactor = (collateralUsdAmount / (mintedST * (minLiquidationThreshold / 100))) * 1.25; // multiplied by a buffer for the healthFactor
 
       const newPosition: LoanPosition = {
         id: loanNftUnit, // loanNFT unit is unique for each loan so it can be used as an ID
@@ -104,6 +104,85 @@ const getUserLoanUtxos = async (walletUtxos: UTxO[]) => {
   });
 
   return userLoanPositions;
+}
+
+// get user balances
+const getUserBalances = async (wallet: IWallet) => {
+  const { assetObject } = setup();
+
+  const balance = await wallet.getBalance();
+  const iUSDBalance = balance.find(bal => bal.unit === assetObject["iUSD"].unit);
+  const USDMBalance = balance.find(bal => bal.unit === assetObject["USDM"].unit);
+  const STBalance = balance.find(bal => bal.unit === assetObject["ST"].unit);
+
+  return {
+    iUSDBalance: Number(iUSDBalance?.quantity ?? "") / 1000000,
+    USDMBalance: Number(USDMBalance?.quantity ?? "") / 1000000,
+    STBalance: Number(STBalance?.quantity ?? "") / 1000000,
+  };
+}
+
+// get user swap orders
+const getUserSwapOrders = async (address: string) => {
+  const orderUtxos = await blockchainProvider.fetchAddressUTxOs(OrderValidatorAddr);
+  let swapOrders: SwapOrder[] = [];
+
+  const userOrderUtxos = orderUtxos.filter(utxo => {
+    const datumData = utxo.output.plutusData
+    if (!datumData) {
+        return false;
+    }
+    const datum = deserializeDatum<OrderDatumType>(datumData);
+
+    if (!(datum.fields.length === 4)) return false;
+
+    const addrInUtxo = serializeAddressObj(datum.fields[1]);
+
+    if (addrInUtxo === address) {
+      const canceller = datum.fields[2].bytes;
+
+      const orderType = datum.fields[0].constructor;
+      const tokenPid = datum.fields[3].fields[1].bytes;
+      const tokenName = datum.fields[3].fields[2].bytes;
+
+      let fromToken = "";
+      let toToken = "";
+      let amount = 0;
+
+      if (orderType === 0) {
+        fromToken = toUTF8(tokenName);
+        toToken = "ST";
+        const amountAsset = utxo.output.amount.find(amt => amt.unit === (tokenPid + tokenName));
+        amount = Number(amountAsset?.quantity ?? '') / 1000000;
+      } else {
+        fromToken = "ST";
+        toToken = toUTF8(tokenName);
+
+        const { assetObject } = setup();
+        const amountAsset = utxo.output.amount.find(amt => amt.unit === assetObject["ST"].unit);
+        amount = Number(amountAsset?.quantity ?? '') / 1000000;
+      }
+
+      const newSwapOrder: SwapOrder = {
+        id: utxo.input.txHash + utxo.input.outputIndex,
+        fromToken,
+        toToken,
+        fromAmount: amount,
+        expectedToAmount: amount,
+        rate: 1.00,
+        timestamp: new Date(),
+        status: 'pending',
+        canceller,
+        utxo,
+      }
+
+      swapOrders = [...swapOrders, newSwapOrder];
+
+      return true;
+    }
+  });
+
+  return swapOrders;
 }
 
 const UCVUtxos = await blockchainProvider.fetchAddressUTxOs(UnifiedControlValidatorAddr);
@@ -179,6 +258,95 @@ const getMinCollateral = (
   }
 }
 
+// Get an asset's price
+const getAssetPrice = (
+  collateralAssetUnit: string,
+) => {
+  if (oracleUtxo && protocolParametersUtxo) {
+    const oraclePlutusData = oracleUtxo.output.plutusData;
+    if (!oraclePlutusData) throw new Error("no oracle datum");
+    const oracleDatum = deserializeDatum<OracleDatum>(oraclePlutusData);
+
+    const assetRate = oracleDatum.fields[0].list.find(
+      (rate) => rate.fields[0].bytes == collateralAssetUnit
+    );
+    if (!assetRate) throw new Error("asset rate not found");
+
+    const assetUsdRatePrecised = (Number(assetRate.fields[1].int) * precisionFactor) / Number(assetRate.fields[2].int);
+
+    return Number(assetUsdRatePrecised / precisionFactor).toFixed(2);
+  } else {
+    throw new Error('Oracle Utxo not found');
+  }
+}
+
+// get protocol parameters
+const getProtocolParamters = () => {
+  if (!protocolParametersUtxo) throw new Error("protocol parameters utxo doesn't exist");
+
+  const pParamsPlutusData = protocolParametersUtxo.output.plutusData;
+  if (!pParamsPlutusData) throw new Error("no pParams datum");
+  const pParamsDatum = deserializeDatum<ProtocolParametersDatum>(pParamsPlutusData);
+
+  const stAsset = {
+    isStable: pParamsDatum.fields[5].fields[0].constructor === 0 ? false : true,
+    policyId: pParamsDatum.fields[5].fields[1].bytes,
+    assetName: pParamsDatum.fields[5].fields[2].bytes,
+  };
+
+  const collateralAssets = pParamsDatum.fields[6].list.map(ast => {
+    return {
+      isStable: ast.fields[0].constructor === 0 ? false : true,
+      policyId: ast.fields[1].bytes,
+      assetName: ast.fields[2].bytes,
+    };
+  });
+
+  const swappableAssets = pParamsDatum.fields[7].list.map(ast => {
+    return {
+      isStable: ast.fields[0].constructor === 0 ? false : true,
+      policyId: ast.fields[1].bytes,
+      assetName: ast.fields[2].bytes,
+    };
+  });
+
+  const authorizedBatchers = pParamsDatum.fields[8].list.map(b => b.bytes);
+
+  return {
+    loanToValueRatio: Number(pParamsDatum.fields[0].int),
+    minCollateralRatio: Number(pParamsDatum.fields[1].int),
+    minLiquidationThreshold: Number(pParamsDatum.fields[2].int),
+    minLoanAmount: Number(pParamsDatum.fields[3].int),
+    protocolUsageFee: Number(pParamsDatum.fields[4].int),
+    stAsset,
+    collateralAssets,
+    swappableAssets,
+    authorizedBatchers,
+    admin: pParamsDatum.fields[9].bytes,
+  };
+}
+
+// get collateral and swap tokens
+const getCollateralAndSwapTokens = () => {
+  const { collateralAssets, swappableAssets, loanToValueRatio, minLiquidationThreshold } = getProtocolParamters();
+
+  const allowedCollateralTokens: CollateralToken[] = collateralAssets.map(ast => ({
+    symbol: toUTF8(ast.assetName) === 'lovelace' ? 'ADA' : toUTF8(ast.assetName),
+    name: 'Cardano',
+    price: Number(getAssetPrice(ast.policyId + ast.assetName)),
+    maxLTV: loanToValueRatio,
+    liquidationThreshold: minLiquidationThreshold,
+  }));
+
+  const swappableTokens: string[] = swappableAssets.map(ast => toUTF8(ast.assetName));
+  swappableTokens.push('ST');
+
+  return {
+    allowedCollateralTokens,
+    swappableTokens,
+  };
+}
+
 const getLoanPositionDetails = (loanPosition: UTxO) => {
     const datumData = loanPosition.output.plutusData
     if (!datumData) {
@@ -210,6 +378,11 @@ const collateralUtxos = await blockchainProvider.fetchAddressUTxOs(CollateralVal
 export {
   getUserDepositUtxo,
   getUserLoanUtxos,
+  getUserBalances,
+  getUserSwapOrders,
+  getAssetPrice,
+  getProtocolParamters,
+  getCollateralAndSwapTokens,
   getPParamsUtxo,
   getOracleUtxo,
   getLiqUtxo,

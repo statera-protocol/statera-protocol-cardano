@@ -1,29 +1,45 @@
-import { mConStr0, mConStr1, mPubKeyAddress } from "@meshsdk/core";
-import { txBuilder, wallet1, wallet1Address, wallet1SK, wallet1Utxos, wallet1VK, wallet2SK, wallet2VK } from "../setup.js";
-import { batchingAsset, OrderValidatorAddr } from "./validators.js";
+import { IWallet, mConStr0, mConStr1, MeshTxBuilder, mPubKeyAddress, UTxO } from "@meshsdk/core";
+import { OrderValidatorAddr } from "./validators";
+import { setup } from "../setup";
 
-const mAddr1 = mPubKeyAddress(wallet1VK, wallet1SK);
-const mAddr2 = mPubKeyAddress(wallet2VK, wallet2SK);
+export const createBuyOrder = async (
+    txBuilder: MeshTxBuilder,
+    wallet: IWallet,
+    walletAddress: string,
+    walletUtxos: UTxO[],
+    walletVK: string,
+    walletSK: string,
+    amount: number,
+    assetName: string,
+) => {
+    const { assetObject } = setup();
 
-const OrderDatum = mConStr0([
-    mConStr0([]), // Buy
-    mAddr1,
-    wallet1VK,
-    mConStr0([
-        mConStr1([]),
-        batchingAsset.policy,
-        batchingAsset.name,
-    ]),
-]);
+    const mAddr = mPubKeyAddress(walletVK, walletSK);
 
-const unsignedTx = await txBuilder
-    .txOut(OrderValidatorAddr, [{ unit: batchingAsset.unit, quantity: "15000000" }]) // Buy
-    .txOutInlineDatumValue(OrderDatum)
-    .changeAddress(wallet1Address)
-    .selectUtxosFrom(wallet1Utxos)
-    .complete()
+    const orderAsset = assetObject[assetName];
 
-const signedTx = await wallet1.signTx(unsignedTx);
+    const OrderDatum = mConStr0([
+        mConStr0([]), // Buy
+        mAddr,
+        walletVK,
+        mConStr0([
+            mConStr1([]),
+            orderAsset.policy,
+            orderAsset.name,
+        ]),
+    ]);
 
-const txHash = await wallet1.submitTx(signedTx);
-console.log("Create buy order:", txHash);
+    const unsignedTx = await txBuilder
+        .txOut(OrderValidatorAddr, [{ unit: orderAsset.unit, quantity: String(amount * 1000000) }])
+        .txOutInlineDatumValue(OrderDatum)
+        .changeAddress(walletAddress)
+        .selectUtxosFrom(walletUtxos)
+        .complete()
+
+    const signedTx = await wallet.signTx(unsignedTx, true);
+    const txHash = await wallet.submitTx(signedTx);
+
+    txBuilder.reset();
+
+    return txHash;
+}

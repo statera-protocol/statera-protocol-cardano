@@ -20,6 +20,7 @@ export const setup = () => {
   const StPoolNftName = stringToHex("SPN");
   const StOracleAssetName = stringToHex("STO");
   const StLiquidationAssetName = stringToHex("STL");
+  const StPid = "e7e9f8f662083e491b9f9d234bf94ed9ff41afe78c7a1b24d994ba28"; // can change is smart contract changes
 
   // Reference scripts
   const collateralScriptTxHash = "a06509e429311b9940d3a685b91218755397de2510e297b0308427aa3edf8170";
@@ -30,7 +31,7 @@ export const setup = () => {
   const batchingScriptTxIdx = 0;
 
   const assetObject: AssetObject = {
-      "ada": {
+      "ADA": {
           unit: stringToHex("lovelace"),
           policy: "",
           name: stringToHex("lovelace"),
@@ -49,6 +50,11 @@ export const setup = () => {
           unit: alwaysSuccessMintValidatorHash + stringToHex("hosky"),
           policy: alwaysSuccessMintValidatorHash,
           name: stringToHex("hosky"),
+      },
+      "ST": {
+          unit: StPid + StStableAssetName,
+          policy: StPid,
+          name: StStableAssetName,
       },
   }
 

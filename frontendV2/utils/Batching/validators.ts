@@ -79,8 +79,7 @@ const OrderValidatorRewardAddr = serializeRewardAddress(
 
 console.log("OrderValidatorHash:", OrderValidatorHash);
 
-const batchingAsset = assetObject.USDM;
-
+// const batchingAsset = assetObject.USDM;
 
 // const poolUtxos = await blockchainProvider.fetchAddressUTxOs(PoolValidatorAddr);
 // console.log(poolUtxos[0].output.amount);
@@ -98,5 +97,5 @@ export {
     OrderValidatorHash,
     OrderValidatorAddr,
     OrderValidatorRewardAddr,
-    batchingAsset,
+    // batchingAsset,
 }

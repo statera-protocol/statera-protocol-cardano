@@ -79,7 +79,6 @@ console.log("OrderValidatorHash:", OrderValidatorHash);
 
 const batchingAsset = assetObject.USDM;
 
-
 // const poolUtxos = await blockchainProvider.fetchAddressUTxOs(PoolValidatorAddr);
 // console.log(poolUtxos[0].output.amount);
 // const orderUtxos = await blockchainProvider.fetchAddressUTxOs(OrderValidatorAddr);

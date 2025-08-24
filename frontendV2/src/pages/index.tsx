@@ -17,10 +17,12 @@ import {
   ProtocolStats,
   ProtocolParameter,
   OracleUTxO,
-  LiquidationReceiver
+  LiquidationReceiver,
+  SwapOrder,
+  ProcessingState
 } from '../types';
 import { useWalletCustom } from '@/components/WalletConnectionContext';
-import { getUserDepositUtxo, getUserLoanUtxos } from '../../utils/utils';
+import { getCollateralAndSwapTokens, getUserBalances, getUserDepositUtxo, getUserLoanUtxos, getUserSwapOrders } from '../../utils/utils';
 import { newBalance } from '../../utils/CollateralValidator/newBalance';
 import { increaseBalance } from '../../utils/CollateralValidator/increaseBalance';
 import { reduceBalance } from '../../utils/CollateralValidator/reduceBalance';
@@ -31,20 +33,22 @@ import { increaseLoanCollateral } from '../../utils/LoanNFT/increaseLoanCollater
 import { reduceLoanCollateral } from '../../utils/LoanNFT/reduceLoanCollateral';
 import { partialRepayLoan } from '../../utils/LoanNFT/partialRepayLoan';
 import { repayLoan } from '../../utils/LoanNFT/repayLoan';
+import { createBuyOrder } from '../../utils/Batching/createBuyOrder';
+import { createSellOrder } from '../../utils/Batching/createSellOrder';
+import { cancelOrder } from '../../utils/Batching/cancelOrder';
 
 function Home() {
-  // const [wallet, setWallet] = useState<IWallet>(null);
   const {
-    address, connected, walletName, balance, disconnect, walletVK,
+    address, connected, balance, disconnect, walletVK, walletSK,
     txBuilder, wallet, walletCollateral, walletUtxos, blockchainProvider, refreshWalletState,
   } = useWalletCustom();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [isProcessing, setIsProcessing] = useState<ProcessingState>({ bool: false, action: 'deposit', });
 
   // Admin wallets - in real app this would be managed differently
-  const adminWallets = ['addr1q9x7z...k2m4n8']; // Mock admin wallet
-  const isAdmin = connected && adminWallets.includes(address);
+  const adminWallets = ['addr_test1qztvhvnujmd03j4cjr0x6lu87hlaqfdl3tyqw97tcnaw0kk5wsnj53x9v8dhupg6v8rzt48atr6zmrvlppkam7upd29sqeutm7']; // Mock admin wallet
+  const [isAdmin, setIsAdmin] = useState(false);
 
   // Mock data - in real app this would come from Cardano blockchain
   const [userPosition, setUserPosition] = useState<UserPosition>({
@@ -63,59 +67,42 @@ function Home() {
   });
 
   const [transactions, setTransactions] = useState<Transaction[]>([
-    {
-      id: '1',
-      type: 'deposit',
-      amount: 250.0,
-      token: 'ADA',
-      timestamp: new Date(Date.now() - 86400000),
-      status: 'completed',
-    },
-    {
-      id: '2',
-      type: 'mint',
-      amount: 200.0,
-      token: 'ST',
-      timestamp: new Date(Date.now() - 172800000),
-      status: 'completed',
-    },
-    {
-      id: '3',
-      type: 'swap',
-      amount: 100.0,
-      token: 'USDC',
-      timestamp: new Date(Date.now() - 259200000),
-      status: 'completed',
-    },
+    // {
+    //   id: '1',
+    //   type: 'deposit',
+    //   amount: 250.0,
+    //   token: 'ADA',
+    //   timestamp: new Date(Date.now() - 86400000),
+    //   status: 'completed',
+    // },
+    // {
+    //   id: '2',
+    //   type: 'mint',
+    //   amount: 200.0,
+    //   token: 'ST',
+    //   timestamp: new Date(Date.now() - 172800000),
+    //   status: 'completed',
+    // },
+    // {
+    //   id: '3',
+    //   type: 'swap',
+    //   amount: 100.0,
+    //   token: 'USDC',
+    //   timestamp: new Date(Date.now() - 259200000),
+    //   status: 'completed',
+    // },
   ]);
 
   const [userBalances, setUserBalances] = useState<{ [token: string]: number }>({
-    ADA: 1250.75,
-    USDC: 500.0,
-    USDT: 300.0,
-    ST: 150.0,
+    ADA: 0.00,
+    iUSD: 0.00,
+    USDM: 0.00,
+    ST: 0.00,
   });
 
-  const [loanPositions, setLoanPositions] = useState<LoanPosition[]>([
-    {
-      id: '1',
-      collateralToken: 'ada',
-      collateralAmount: 400.0,
-      mintedST: 200.0,
-      healthFactor: 2.4,
-      createdAt: new Date(Date.now() - 86400000 * 7),
-      collateralUtxo: undefined,
-    },
-    {
-      id: '2',
-      collateralToken: 'USDC',
-      collateralAmount: 300.0,
-      mintedST: 250.0,
-      healthFactor: 1.8,
-      createdAt: new Date(Date.now() - 86400000 * 3),
-      collateralUtxo: undefined,
-    },
-  ]);
+  const [swapOrders, setSwapOrders] = useState<SwapOrder[]>([]);
+
+  const [loanPositions, setLoanPositions] = useState<LoanPosition[]>([]);
 
   // Admin data
   const [protocolParameters, setProtocolParameters] = useState<ProtocolParameter[]>([
@@ -181,63 +168,70 @@ function Home() {
     },
   ]);
 
-  const collateralTokens: CollateralToken[] = [
-    {
-      symbol: 'ada',
-      name: 'Cardano',
-      price: 1.2,
-      maxLTV: 80,
-      liquidationThreshold: 80,
-    },
-    {
-      symbol: 'USDC',
-      name: 'USD Coin',
-      price: 1.0,
-      maxLTV: 80,
-      liquidationThreshold: 85,
-    },
-    {
-      symbol: 'USDT',
-      name: 'Tether',
-      price: 1.0,
-      maxLTV: 80,
-      liquidationThreshold: 85,
-    },
-  ];
+  const [collateralTokens, setCollateralTokens] = useState<CollateralToken[]>([]);
+
+  const [swapTokens, setSwapTokens] = useState<string[]>([]);
 
   const swapPairs: SwapPair[] = [
-    { from: 'USDC', to: 'ST', rate: 0.98, available: true },
-    { from: 'ST', to: 'USDC', rate: 1.02, available: true },
-    { from: 'USDT', to: 'ST', rate: 0.97, available: true },
-    { from: 'ST', to: 'USDT', rate: 1.03, available: true },
+    { from: 'iUSD', to: 'ST', rate: 1.00, available: true },
+    { from: 'ST', to: 'iUSD', rate: 1.00, available: true },
+    { from: 'USDM', to: 'ST', rate: 1.00, available: true },
+    { from: 'ST', to: 'USDM', rate: 1.00, available: true },
   ];
 
-  // update data after wallet is connected
+  // update application state on startup
+  useEffect(() => {
+    // set collateral and swap tokens
+    const { allowedCollateralTokens, swappableTokens } = getCollateralAndSwapTokens();
+    setCollateralTokens(allowedCollateralTokens);
+    setSwapTokens(swappableTokens);
+  }, []);
+
+  // update user data after wallet is connected
   useEffect(() => {
     (async () => {
-      await refreshWalletState();
+      if (connected) {
+        await refreshWalletState();
 
-      const userDepositUtxo = await getUserDepositUtxo(walletVK);
-      const userDepositUtxoAda = parseFloat((Number(userDepositUtxo?.output.amount[0].quantity ?? "") / 1000000).toFixed(2));
-      console.log("userDepositUtxoAda:", userDepositUtxoAda);
+        // get user deposit ADA balance
+        const userDepositUtxo = await getUserDepositUtxo(walletVK);
+        const userDepositUtxoAda = parseFloat((Number(userDepositUtxo?.output.amount[0].quantity ?? "") / 1000000).toFixed(2));
+        console.log("userDepositUtxoAda:", userDepositUtxoAda);
 
-      // udate user total deposit
-      setUserPosition(prev => ({
-        ...prev,
-        totalDeposit: userDepositUtxoAda,
-      }));
-      // update user balances
-      setUserBalances(prev => ({
-        ...prev,
-        ADA: parseFloat((Number(balance[0]?.quantity ?? "") / 1000000).toFixed(2))
-      }));
-      // update user loan positions
-      const userLoanPositions = await getUserLoanUtxos(walletUtxos);
-      setLoanPositions(prev =>
-        Array.from(new Map([...prev, ...userLoanPositions].map(p => [p.id, p])).values())
-      );
+        // get other user balances
+        const { iUSDBalance, USDMBalance, STBalance, } = await getUserBalances(wallet);
+
+        // get user swap orders
+        const swapOrders = await getUserSwapOrders(address);
+
+        // udate user total deposit
+        setUserPosition(prev => ({
+          ...prev,
+          totalDeposit: userDepositUtxoAda,
+        }));
+        // update user balances
+        setUserBalances(prev => ({
+          ...prev,
+          ADA: parseFloat((Number(balance[0]?.quantity ?? "") / 1000000).toFixed(2)),
+          iUSD: iUSDBalance,
+          USDM: USDMBalance,
+          ST: STBalance,
+        }));
+        // update user loan positions
+        const userLoanPositions = await getUserLoanUtxos(walletUtxos);
+        setLoanPositions(prev =>
+          Array.from(new Map([...prev, ...userLoanPositions].map(p => [p.id, p])).values())
+        );
+        // update user swap orders
+        setSwapOrders(prev =>
+          Array.from(new Map([...prev, ...swapOrders].map(p => [p.id, p])).values())
+        ); 
+
+        // Set the admin tab visibility
+        setIsAdmin(adminWallets.includes(address));
+      }
     })();
-  }, [wallet, connected, walletVK, isProcessing])
+  }, [wallet, connected, walletVK, isProcessing.bool])
 
   // handle wallet disconnect
   const handleWalletDisconnect = () => {
@@ -247,7 +241,7 @@ function Home() {
 
   // handle new deposit
   const handleNewDeposit = async (amount: number) => {
-    setIsProcessing(true);
+    setIsProcessing({ bool: true, action: 'deposit', });
 
     if (!txBuilder || !walletCollateral || !blockchainProvider) {
       throw new Error("txBuilder or walletCollateral or blockchainProvider is null")
@@ -266,19 +260,19 @@ function Home() {
       );
     } catch (err) {
       txBuilder.reset();
-      setIsProcessing(false);
+      setIsProcessing({ bool: false, action: 'deposit', });
       console.log("handleNewDeposit error:", err);
     }
 
     blockchainProvider.onTxConfirmed(txHash, () => {
-      setIsProcessing(false);
+      setIsProcessing({ bool: false, action: 'deposit', });
       console.log("New balance txHash:", txHash);
     });
   };
 
   // handle increase deposit
   const handleIncreaseDeposit = async (amount: number) => {
-    setIsProcessing(true);
+    setIsProcessing({ bool: true, action: 'deposit', });
 
     if (!txBuilder || !walletCollateral || !blockchainProvider) {
       throw new Error("txBuilder or walletCollateral or blockchainProvider is null")
@@ -297,19 +291,19 @@ function Home() {
       );
     } catch (err) {
       txBuilder.reset();
-      setIsProcessing(false);
+      setIsProcessing({ bool: false, action: 'deposit', });
       console.log("handleIncreaseDeposit error:", err);
     }
 
     blockchainProvider.onTxConfirmed(txHash, () => {
-      setIsProcessing(false);
+      setIsProcessing({ bool: false, action: 'deposit', });
       console.log("Increase balance txHash:", txHash);
     });
   };
 
   // handle withdraw deposit
   const handleWithdrawDeposit = async (amount: number) => {
-    setIsProcessing(true);
+    setIsProcessing({ bool: true, action: 'deposit', });
 
     if (!txBuilder || !walletCollateral || !blockchainProvider) {
       throw new Error("txBuilder or walletCollateral or blockchainProvider is null")
@@ -328,12 +322,12 @@ function Home() {
       );
     } catch (err) {
       txBuilder.reset();
-      setIsProcessing(false);
+      setIsProcessing({ bool: false, action: 'deposit', });
       console.log("handleWithdrawDeposit error:", err);
     }
 
     blockchainProvider.onTxConfirmed(txHash, () => {
-      setIsProcessing(false);
+      setIsProcessing({ bool: false, action: 'deposit', });
       console.log("Reduce balance txHash:", txHash);
     });
   };
@@ -361,7 +355,7 @@ function Home() {
   // };
 
   const handleCloseAccount = async () => {
-    setIsProcessing(true);
+    setIsProcessing({ bool: true, action: 'deposit', });
 
     if (!txBuilder || !walletCollateral || !blockchainProvider) {
       throw new Error("txBuilder or walletCollateral or blockchainProvider is null")
@@ -379,18 +373,18 @@ function Home() {
       );
     } catch (err) {
       txBuilder.reset();
-      setIsProcessing(false);
+      setIsProcessing({ bool: false, action: 'deposit', });
       console.log("handleCloseAccount error:", err);
     }
 
     blockchainProvider.onTxConfirmed(txHash, () => {
-      setIsProcessing(false);
+      setIsProcessing({ bool: false, action: 'deposit', });
       console.log("Withdraw all balance txHash:", txHash);
     });
   };
 
   const handleCreateLoan = async (token: string, collateralAmount: number, mintAmount: number) => {
-    setIsProcessing(true);
+    setIsProcessing({ bool: true, action: 'loan', });
 
     if (!txBuilder || !walletCollateral || !blockchainProvider) {
       throw new Error("txBuilder or walletCollateral or blockchainProvider is null")
@@ -414,12 +408,12 @@ function Home() {
       );
     } catch (err) {
       txBuilder.reset();
-      setIsProcessing(false);
+      setIsProcessing({ bool: false, action: 'loan', });
       console.log("handleCreateLoan error:", err);
     }
 
     blockchainProvider.onTxConfirmed(txHash, () => {
-      setIsProcessing(false);
+      setIsProcessing({ bool: false, action: 'loan', });
       console.log('Take loan txHash:', txHash);
     });
 
@@ -504,7 +498,7 @@ function Home() {
   };
 
   const handleIncreaseCollateral = async (loanId: string, amount: number) => {
-    setIsProcessing(true);
+    setIsProcessing({ bool: true, action: 'loan', });
 
     if (!txBuilder || !walletCollateral || !blockchainProvider) {
       throw new Error("txBuilder or walletCollateral or blockchainProvider is null")
@@ -513,13 +507,9 @@ function Home() {
     const loan = loanPositions.find(loanPos => loanPos.id === loanId);
     if (!loan || !loan.collateralUtxo) throw new Error("Loan or loan's collateral Utxo is undefined!");
 
-    // const { assetObject } = setup();
-    // const collateralAsset = assetObject[token];
-
     let txHash = "";
     try {
       txHash = await increaseLoanCollateral(
-        // blockchainProvider,
         txBuilder,
         wallet,
         address,
@@ -528,22 +518,21 @@ function Home() {
         walletVK,
         amount,
         loan.collateralUtxo,
-        // collateralAsset,
       );
     } catch (err) {
       txBuilder.reset();
-      setIsProcessing(false);
+      setIsProcessing({ bool: false, action: 'loan', });
       console.log("handleIncreaseCollateral error:", err);
     }
 
     blockchainProvider.onTxConfirmed(txHash, () => {
-      setIsProcessing(false);
+      setIsProcessing({ bool: false, action: 'loan', });
       console.log("Increase collateral txHash:", txHash);
     });
   };
 
   const handleReduceCollateral = async (loanId: string, amount: number) => {
-    setIsProcessing(true);
+    setIsProcessing({ bool: true, action: 'loan', });
 
     if (!txBuilder || !walletCollateral || !blockchainProvider) {
       throw new Error("txBuilder or walletCollateral or blockchainProvider is null")
@@ -551,9 +540,6 @@ function Home() {
 
     const loan = loanPositions.find(loanPos => loanPos.id === loanId);
     if (!loan || !loan.collateralUtxo) throw new Error("Loan or loan's collateral Utxo is undefined!");
-
-    // const { assetObject } = setup();
-    // const collateralAsset = assetObject[token];
 
     let txHash = "";
     try {
@@ -569,18 +555,18 @@ function Home() {
       );
     } catch (err) {
       txBuilder.reset();
-      setIsProcessing(false);
+      setIsProcessing({ bool: false, action: 'loan', });
       console.log("handleReduceCollateral error:", err);
     }
 
     blockchainProvider.onTxConfirmed(txHash, () => {
-      setIsProcessing(false);
+      setIsProcessing({ bool: false, action: 'loan', });
       console.log("Reduce collateral txHash:", txHash);
     });
   };
 
   const handlePartialRepayLoan = async (loanId: string, amount: number) => {
-    setIsProcessing(true);
+   setIsProcessing({ bool: true, action: 'loan', });
 
     if (!txBuilder || !walletCollateral || !blockchainProvider) {
       throw new Error("txBuilder or walletCollateral or blockchainProvider is null")
@@ -588,9 +574,6 @@ function Home() {
 
     const loan = loanPositions.find(loanPos => loanPos.id === loanId);
     if (!loan || !loan.collateralUtxo) throw new Error("Loan or loan's collateral Utxo is undefined!");
-
-    // const { assetObject } = setup();
-    // const collateralAsset = assetObject[token];
 
     let txHash = "";
     try {
@@ -605,18 +588,18 @@ function Home() {
       );
     } catch (err) {
       txBuilder.reset();
-      setIsProcessing(false);
+      setIsProcessing({ bool: false, action: 'loan', });
       console.log("handlePartialRepayLoan error:", err);
     }
 
     blockchainProvider.onTxConfirmed(txHash, () => {
-      setIsProcessing(false);
+      setIsProcessing({ bool: false, action: 'loan', });
       console.log("Partial repay loan txHash:", txHash);
     });
   };
 
   const handleFullRepayLoan = async (loanId: string) => {
-    setIsProcessing(true);
+    setIsProcessing({ bool: true, action: 'loan', });
 
     if (!txBuilder || !walletCollateral || !blockchainProvider) {
       throw new Error("txBuilder or walletCollateral or blockchainProvider is null")
@@ -643,12 +626,12 @@ function Home() {
       );
     } catch (err) {
       txBuilder.reset();
-      setIsProcessing(false);
+      setIsProcessing({ bool: false, action: 'loan', });
       console.log("handleFullRepayLoan error:", err);
     }
 
     blockchainProvider.onTxConfirmed(txHash, () => {
-      setIsProcessing(false);
+      setIsProcessing({ bool: false, action: 'loan', });
       console.log('Full Repayment tx hash:', txHash);
     });
   };
@@ -736,28 +719,140 @@ function Home() {
 
     const toAmount = amount * pair.rate;
 
-    setUserBalances(prev => ({
-      ...prev,
-      [fromToken]: prev[fromToken] - amount,
-      [toToken]: prev[toToken] + toAmount,
-    }));
+    if (fromToken !== "ST") {
+      handleBuySwap(toAmount, fromToken);
+    } else {
+      handleSellSwap(toAmount, toToken);
+    }
 
-    const newTransaction: Transaction = {
-      id: Date.now().toString(),
-      type: 'swap',
-      amount,
-      token: fromToken,
-      timestamp: new Date(),
-      status: 'completed',
-    };
-    setTransactions(prev => [newTransaction, ...prev]);
+    // setUserBalances(prev => ({
+    //   ...prev,
+    //   [fromToken]: prev[fromToken] - amount,
+    //   [toToken]: prev[toToken] + toAmount,
+    // }));
+
+    // const newTransaction: Transaction = {
+    //   id: Date.now().toString(),
+    //   type: 'swap',
+    //   amount,
+    //   token: fromToken,
+    //   timestamp: new Date(),
+    //   status: 'completed',
+    // };
+    // setTransactions(prev => [newTransaction, ...prev]);
   };
 
-  const calculateHealthFactor = (collateralValue: number, debt: number): number => {
-    if (debt === 0) return Infinity;
-    const tokenInfo = collateralTokens.find(t => t.symbol === 'ADA'); // Simplified for demo
-    const collateralValueUSD = collateralValue * (tokenInfo?.price || 0.45);
-    return (collateralValueUSD * 0.8) / debt; // 80% liquidation threshold
+  const handleBuySwap = async (amount: number, assetName: string) => {
+    setIsProcessing({ bool: true, action: 'swap', });
+
+    if (!txBuilder || !walletCollateral || !blockchainProvider) {
+      throw new Error("txBuilder or walletCollateral or blockchainProvider is null")
+    };
+
+    let txHash = "";
+    try {
+      txHash = await createBuyOrder(
+        txBuilder,
+        wallet,
+        address,
+        walletUtxos,
+        walletVK,
+        walletSK,
+        amount,
+        assetName,
+      );
+    } catch (err) {
+      txBuilder.reset();
+      setIsProcessing({ bool: false, action: 'swap', });
+      console.log("Create buy order:", txHash);
+    }
+
+    blockchainProvider.onTxConfirmed(txHash, () => {
+      setIsProcessing({ bool: false, action: 'swap', });
+      console.log("Create buy order:", txHash);
+    });
+  }
+
+  const handleSellSwap = async (amount: number, assetName: string) => {
+    setIsProcessing({ bool: true, action: 'swap', });
+
+    if (!txBuilder || !walletCollateral || !blockchainProvider) {
+      throw new Error("txBuilder or walletCollateral or blockchainProvider is null")
+    };
+
+    let txHash = "";
+    try {
+      txHash = await createSellOrder(
+        txBuilder,
+        wallet,
+        address,
+        walletUtxos,
+        walletVK,
+        walletSK,
+        amount,
+        assetName,
+      );
+    } catch (err) {
+      txBuilder.reset();
+      setIsProcessing({ bool: false, action: 'swap', });
+      console.log("Create sell order:", txHash);
+    }
+
+    blockchainProvider.onTxConfirmed(txHash, () => {
+      setIsProcessing({ bool: false, action: 'swap', });
+      console.log("Create sell order:", txHash);
+    });
+  }
+
+  const handleCancelSwap = async (orderId: string) => {
+    const order = swapOrders.find(o => o.id === orderId);
+
+    setIsProcessing({ bool: true, action: 'swap', });
+
+    if (!txBuilder || !walletCollateral || !blockchainProvider || !order) {
+      throw new Error("txBuilder or walletCollateral or blockchainProvider or order is null")
+    };
+
+    let txHash = "";
+    try {
+      txHash = await cancelOrder(
+        txBuilder,
+        wallet,
+        walletUtxos,
+        walletCollateral,
+        order.utxo,
+        order.canceller,
+        address,
+      );
+    } catch (err) {
+      txBuilder.reset();
+      setIsProcessing({ bool: false, action: 'swap', });
+      console.log("Cancel order:", txHash);
+    }
+
+    blockchainProvider.onTxConfirmed(txHash, () => {
+      setIsProcessing({ bool: false, action: 'swap', });
+      console.log("Cancel order:", txHash);
+    });
+
+    // const order = swapOrders.find(o => o.id === orderId);
+    // if (!order || order.status !== 'pending') return;
+
+    // // Return the locked tokens to user balance
+    // setUserBalances(prev => ({
+    //   ...prev,
+    //   [order.fromToken]: prev[order.fromToken] + order.fromAmount,
+    // }));
+
+    // // Update swap order status
+    // setSwapOrders(prev => prev.map(o => 
+    //   o.id === orderId ? { ...o, status: 'cancelled' } : o
+    // ));
+
+    // // Update transaction status
+    // setTransactions(prev => prev.map(tx => 
+    //   tx.id === orderId ? { ...tx, status: 'failed' } : tx
+    // ));
   };
 
   if (!connected) {
@@ -807,8 +902,6 @@ function Home() {
           {/* Wallet Connection */}
           <div className="max-w-md mx-auto">
             <WalletConnection
-              // wallet={wallet}
-              // onConnect={handleWalletConnect}
               onDisconnect={handleWalletDisconnect}
             />
           </div>
@@ -842,8 +935,6 @@ function Home() {
             </div>
             <div className="ml-auto">
               <WalletConnection
-                // wallet={wallet}
-                // onConnect={handleWalletConnect}
                 onDisconnect={handleWalletDisconnect}
               />
             </div>
@@ -887,10 +978,14 @@ function Home() {
         
         {activeTab === 'swap' && (
           <SwapModule
+            availableTokens={swapTokens}
             swapPairs={swapPairs}
             userBalances={userBalances}
+            swapOrders={swapOrders}
             hasDeposit={userPosition.totalDeposit > 0}
             onSwap={handleSwap}
+            onCancelSwap={handleCancelSwap}
+            isProcessing={isProcessing}
           />
         )}
         

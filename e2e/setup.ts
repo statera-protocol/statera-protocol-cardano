@@ -102,7 +102,7 @@ const evaluator = new OfflineEvaluator(blockchainProvider, "preprod");
 const txBuilder = new MeshTxBuilder({
     fetcher: blockchainProvider,
     submitter: blockchainProvider,
-    // evaluator: evaluator, // Can also be "evaluator: blockchainProvider,"
+    evaluator: evaluator, // Can also be "evaluator: blockchainProvider,"
     // evaluator: blockchainProvider,
     verbose: false,
 });

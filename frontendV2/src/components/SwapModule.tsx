@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { ArrowUpDown, ArrowRight, AlertTriangle } from 'lucide-react';
+import { ArrowUpDown, ArrowRight, AlertTriangle, Clock, X } from 'lucide-react';
+import { ProcessingState, SwapOrder } from '../types';
 
 interface SwapPair {
   from: string;
@@ -8,18 +9,31 @@ interface SwapPair {
 }
 
 interface SwapModuleProps {
+  availableTokens: string[];
   swapPairs: SwapPair[];
   userBalances: Record<string, number>;
+  swapOrders: SwapOrder[];
   hasDeposit: boolean;
   onSwap: (fromToken: string, toToken: string, amount: number) => void;
+  onCancelSwap: (orderId: string) => void;
+  isProcessing: ProcessingState;
 }
 
-export default function SwapModule({ swapPairs, userBalances, hasDeposit, onSwap }: SwapModuleProps) {
-  const [fromToken, setFromToken] = useState('USDC');
+export default function SwapModule({
+  availableTokens,
+  swapPairs,
+  userBalances,
+  swapOrders,
+  hasDeposit,
+  onSwap,
+  onCancelSwap,
+  isProcessing,
+}: SwapModuleProps) {
+  const [fromToken, setFromToken] = useState('USDM');
   const [toToken, setToToken] = useState('ST');
   const [amount, setAmount] = useState('');
 
-  const availableTokens = ['USDC', 'USDT', 'DAI', 'ST'];
+  const swapIsProcessing = isProcessing.bool && isProcessing.action === 'swap';
   
   const currentPair = swapPairs.find(pair => 
     pair.from === fromToken && pair.to === toToken
@@ -141,29 +155,87 @@ export default function SwapModule({ swapPairs, userBalances, hasDeposit, onSwap
           disabled={!amount || parseFloat(amount) <= 0 || !currentPair}
           className="w-full mt-6 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold py-3 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2"
         >
-          <ArrowRight className="w-4 h-4" />
-          <span>Swap Tokens</span>
+          {swapIsProcessing ? 'Processing...' :
+            <>
+              <ArrowRight className="w-4 h-4" />
+              <span>Swap Tokens</span>
+            </>
+          }
         </button>
           </div>
 
+          {/* Pending Orders */}
+          {swapOrders.filter(order => order.status === 'pending').length > 0 && (
+            <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+              <h3 className="text-lg font-semibold text-white mb-4">Pending Orders</h3>
+              <div className="space-y-3">
+                {swapOrders
+                  .filter(order => order.status === 'pending')
+                  .map((order) => (
+                    <div key={order.id} className="flex items-center justify-between p-3 bg-gray-700 rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <Clock className="w-4 h-4 text-yellow-400" />
+                        <div>
+                          <span className="text-white">
+                            {order.fromAmount.toFixed(2)} {order.fromToken} → {order.expectedToAmount.toFixed(2)} {order.toToken}
+                          </span>
+                          <p className="text-xs text-gray-400">
+                            Rate: 1 {order.fromToken} = {order.rate} {order.toToken}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-xs text-yellow-400 bg-yellow-900/20 px-2 py-1 rounded">
+                          Pending
+                        </span>
+                        <button
+                          onClick={() => onCancelSwap(order.id)}
+                          className="p-1 text-gray-400 hover:text-red-400 hover:bg-gray-600 rounded transition-colors"
+                          title="Cancel Order"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+
           {/* Recent Swaps */}
           <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-            <h3 className="text-lg font-semibold text-white mb-4">Recent Swaps</h3>
+            <h3 className="text-lg font-semibold text-white mb-4">Swap History</h3>
             <div className="space-y-3">
-              <div className="flex items-center justify-between p-3 bg-gray-700 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <ArrowRight className="w-4 h-4 text-purple-400" />
-                  <span className="text-white">100 USDC → 99.5 ST</span>
+              {swapOrders
+                .filter(order => order.status !== 'pending')
+                .slice(0, 5)
+                .map((order) => (
+                  <div key={order.id} className="flex items-center justify-between p-3 bg-gray-700 rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <ArrowRight className="w-4 h-4 text-purple-400" />
+                      <span className="text-white">
+                        {order.fromAmount.toFixed(2)} {order.fromToken} → {order.expectedToAmount.toFixed(2)} {order.toToken}
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span className={`text-xs px-2 py-1 rounded ${
+                        order.status === 'executed' 
+                          ? 'text-green-400 bg-green-900/20' 
+                          : 'text-red-400 bg-red-900/20'
+                      }`}>
+                        {order.status === 'executed' ? 'Executed' : 'Cancelled'}
+                      </span>
+                      <span className="text-sm text-gray-400">
+                        {order.timestamp.toLocaleDateString()}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              {swapOrders.filter(order => order.status !== 'pending').length === 0 && (
+                <div className="text-center py-4">
+                  <p className="text-gray-400">No swap history yet</p>
                 </div>
-                <span className="text-sm text-gray-400">2 hours ago</span>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-gray-700 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <ArrowRight className="w-4 h-4 text-purple-400" />
-                  <span className="text-white">50 ST → 50.2 USDT</span>
-                </div>
-                <span className="text-sm text-gray-400">1 day ago</span>
-              </div>
+              )}
             </div>
           </div>
         </>

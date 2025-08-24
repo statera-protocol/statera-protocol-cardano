@@ -23,6 +23,19 @@ export interface Transaction {
   status: 'pending' | 'completed' | 'failed';
 }
 
+export interface SwapOrder {
+  id: string;
+  fromToken: string;
+  toToken: string;
+  fromAmount: number;
+  expectedToAmount: number;
+  rate: number;
+  timestamp: Date;
+  status: 'pending' | 'executed' | 'cancelled';
+  canceller: string;
+  utxo: UTxO;
+}
+
 export interface CollateralToken {
   symbol: string;
   name: string;
@@ -77,4 +90,9 @@ export interface LiquidationReceiver {
   address: string;
   name: string;
   isActive: boolean;
+}
+
+export interface ProcessingState {
+  bool: boolean;
+  action: 'deposit' | 'loan' | 'swap';
 }

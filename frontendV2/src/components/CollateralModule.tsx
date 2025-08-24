@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Shield, Coins, AlertTriangle, Plus, Minus, Edit3, Trash2 } from 'lucide-react';
-import { CollateralToken, LoanPosition } from '../types';
+import { CollateralToken, LoanPosition, ProcessingState } from '../types';
 
 interface CollateralModuleProps {
   collateralTokens: CollateralToken[];
@@ -9,7 +9,7 @@ interface CollateralModuleProps {
   onCreateLoan: (token: string, collateralAmount: number, mintAmount: number) => void;
   onModifyLoan: (loanId: string, action: 'addCollateral' | 'removeCollateral' | 'repay' | 'fullRepay', amount: number) => void;
   onDeleteLoan: (loanId: string) => void;
-  isProcessing: boolean;
+  isProcessing: ProcessingState;
 }
 
 const CollateralModule: React.FC<CollateralModuleProps> = ({
@@ -25,7 +25,6 @@ const CollateralModule: React.FC<CollateralModuleProps> = ({
   const [selectedLoan, setSelectedLoan] = useState<string | null>(null);
   const [action, setAction] = useState<'addCollateral' | 'removeCollateral' | 'repay' | 'fullRepay' | null>(null);
   const [amount, setAmount] = useState('');
-  // const [isProcessing, setIsProcessing] = useState(false);
 
   // Create loan form state
   const [newLoan, setNewLoan] = useState({
@@ -34,37 +33,16 @@ const CollateralModule: React.FC<CollateralModuleProps> = ({
     mintAmount: '',
   });
 
+  const loanIsProcessing = isProcessing.bool && isProcessing.action == 'loan';
+
   const handleCreateLoan = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newLoan.token || !newLoan.collateralAmount || !newLoan.mintAmount) return;
 
-    // // Validate minimum ST minting amount
-    // const selectedToken = collateralTokens.find(t => t.symbol === newLoan.token);
-    // if (selectedToken) {
-    //   const collateralValueUSD = parseFloat(newLoan.collateralAmount) * selectedToken.price;
-    //   const maxMintableAmount = (collateralValueUSD * selectedToken.maxLTV) / 100;
-    //   const minMintableAmount = Math.max(10, maxMintableAmount * 0.1); // Minimum 10 ST or 10% of max mintable
-      
-    //   if (parseFloat(newLoan.mintAmount) < minMintableAmount) {
-    //     alert(`Minimum mintable amount is ${minMintableAmount.toFixed(2)} ST for this collateral`);
-    //     return;
-    //   }
-      
-    //   if (parseFloat(newLoan.mintAmount) > maxMintableAmount) {
-    //     alert(`Maximum mintable amount is ${maxMintableAmount.toFixed(2)} ST for this collateral (${selectedToken.maxLTV}% LTV)`);
-    //     return;
-    //   }
-    // }
     onCreateLoan(newLoan.token, parseFloat(newLoan.collateralAmount), parseFloat(newLoan.mintAmount));
 
     setNewLoan({ token: '', collateralAmount: '', mintAmount: '' });
     setShowCreateLoan(false);
-    // setIsProcessing(false);
-
-    // setIsProcessing(true);
-    // setTimeout(() => {
-      
-    // }, 2000);
   };
 
   // Validation function for create loan button
@@ -89,17 +67,11 @@ const CollateralModule: React.FC<CollateralModuleProps> = ({
   const handleModifyLoan = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedLoan || !action) return;
-    // if (!selectedLoan || !action || !amount) return;
 
     onModifyLoan(selectedLoan, action, parseFloat(amount));
     setAmount('');
     setAction(null);
     setSelectedLoan(null);
-
-    // setIsProcessing(true);
-    // setTimeout(() => {
-    //   // setIsProcessing(false);
-    // }, 2000);
   };
 
   const getHealthFactorColor = (factor: number) => {
@@ -122,11 +94,11 @@ const CollateralModule: React.FC<CollateralModuleProps> = ({
         {hasDeposit ? (
           <button
             onClick={() => setShowCreateLoan(true)}
-            disabled={isProcessing}
+            disabled={loanIsProcessing}
             className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
           >
             <Plus className="w-4 h-4" />
-            <span>{isProcessing ? 'Processing...' :'Create Loan'}</span>
+            <span>Create Loan</span>
           </button>
         ) : (
           <div className="flex items-center space-x-2 bg-gray-700 text-gray-400 px-4 py-2 rounded-lg">
@@ -174,12 +146,6 @@ const CollateralModule: React.FC<CollateralModuleProps> = ({
                     >
                       <Edit3 className="w-4 h-4" />
                     </button>
-                    {/* <button
-                      onClick={() => onDeleteLoan(loan.id)}
-                      className="p-2 text-gray-400 hover:text-red-400 hover:bg-gray-700 rounded-lg transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button> */}
                   </div>
                 </div>
 
@@ -223,10 +189,10 @@ const CollateralModule: React.FC<CollateralModuleProps> = ({
           <p className="text-gray-400 mb-6">Create your first loan position to start minting ST tokens</p>
           <button
             onClick={() => setShowCreateLoan(true)}
-            disabled={isProcessing}
+            disabled={loanIsProcessing}
             className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors"
           >
-            {isProcessing ? 'Processing...' : 'Create Loan'}
+            {loanIsProcessing ? 'Processing...' : 'Create Loan'}
           </button>
         </div>
       )}
@@ -309,10 +275,10 @@ const CollateralModule: React.FC<CollateralModuleProps> = ({
                 </button>
                 <button
                   type="submit"
-                  disabled={isProcessing || !isCreateLoanValid()}
+                  disabled={loanIsProcessing || !isCreateLoanValid()}
                   className="flex-1 py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
                 >
-                  {isProcessing ? 'Creating...' : 'Create Loan'}
+                  {loanIsProcessing ? 'Creating...' : 'Create Loan'}
                 </button>
               </div>
             </form>
@@ -413,10 +379,10 @@ const CollateralModule: React.FC<CollateralModuleProps> = ({
                   </button>
                   <button
                     type="submit"
-                    disabled={isProcessing || (action !== 'fullRepay' && !amount)}
+                    disabled={loanIsProcessing || (action !== 'fullRepay' && !amount)}
                     className="flex-1 py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg transition-colors"
                   >
-                    {isProcessing ? 'Processing...' : 'Confirm'}
+                    {loanIsProcessing ? 'Processing...' : 'Confirm'}
                   </button>
                 </div>
               </form>

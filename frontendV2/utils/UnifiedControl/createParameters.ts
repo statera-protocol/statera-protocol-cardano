@@ -6,8 +6,8 @@ import { st_asset } from "../StMinting/validator.js";
 const collateral_assets = [
     mConStr0([
         mConStr0([]),
-        assetObject.ada.policy,
-        assetObject.ada.name,
+        assetObject.ADA.policy,
+        assetObject.ADA.name,
     ]),
     mConStr0([
         mConStr1([]),

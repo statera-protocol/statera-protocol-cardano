@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { PlusCircle, MinusCircle, X, AlertTriangle } from 'lucide-react';
+import { ProcessingState } from '@/types';
 
 interface DepositModuleProps {
   currentDeposit: number;
@@ -8,7 +9,7 @@ interface DepositModuleProps {
   onDeposit: (amount: number) => void;
   onWithdraw: (amount: number) => void;
   onCloseAccount: () => void;
-  isProcessing: boolean;
+  isProcessing: ProcessingState;
 }
 
 const DepositModule: React.FC<DepositModuleProps> = ({
@@ -24,6 +25,8 @@ const DepositModule: React.FC<DepositModuleProps> = ({
   const [action, setAction] = useState< 'newDeposit' | 'deposit' | 'withdraw' | null>(null);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
 
+  const depositIsProcessing = isProcessing.bool && isProcessing.action === 'deposit';
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!amount || !action) return;
@@ -38,21 +41,6 @@ const DepositModule: React.FC<DepositModuleProps> = ({
     }
     setAmount('');
     setAction(null);
-
-    // setIsProcessing(true);
-    // setTimeout(() => {
-    //   if (action === 'newDeposit') {
-    //     onNewDeposit(parseFloat(amount));
-    //   }
-    //   else if (action === 'deposit') {
-    //     onDeposit(parseFloat(amount));
-    //   } else {
-    //     onWithdraw(parseFloat(amount));
-    //   }
-    //   setAmount('');
-    //   setAction(null);
-    //   // setIsProcessing(false);
-    // }, 2000);
   };
 
   const handleCloseAccount = () => {
@@ -87,7 +75,7 @@ const DepositModule: React.FC<DepositModuleProps> = ({
         </div>
 
         {/* Action Selection */}
-        {(!action && !isProcessing) && currentDeposit > 0 && (
+        {(!action && !depositIsProcessing) && currentDeposit > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             <button
               onClick={() => setAction('deposit')}
@@ -108,7 +96,7 @@ const DepositModule: React.FC<DepositModuleProps> = ({
         )}
 
         {/* Zero Deposit State */}
-        {(!action && !isProcessing) && currentDeposit === 0 && (
+        {(!action && !depositIsProcessing) && currentDeposit === 0 && (
           <div className="text-center mb-6">
             <div className="bg-blue-900/10 border border-blue-700 rounded-lg p-6">
               <div className="w-16 h-16 bg-blue-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -128,7 +116,7 @@ const DepositModule: React.FC<DepositModuleProps> = ({
         )}
 
         {/* Close Account Section */}
-        {(!action && !isProcessing) && currentDeposit > 0 && (
+        {(!action && !depositIsProcessing) && currentDeposit > 0 && (
           <div className="mt-8 pt-6 border-t border-gray-700">
             <div className="bg-red-900/10 border border-red-700 rounded-lg p-4">
               <div className="flex items-start space-x-3">
@@ -151,7 +139,7 @@ const DepositModule: React.FC<DepositModuleProps> = ({
         )}
 
         {/* Amount Input Form */}
-        {((action || isProcessing) && !showCloseConfirm) && (
+        {((action || depositIsProcessing) && !showCloseConfirm) && (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-medium text-white capitalize">
@@ -198,14 +186,14 @@ const DepositModule: React.FC<DepositModuleProps> = ({
             <div className="flex space-x-3">
               <button
                 type="submit"
-                disabled={!amount || isProcessing || parseFloat(amount) <= 0}
+                disabled={!amount || depositIsProcessing || parseFloat(amount) <= 0}
                 className={`flex-1 py-3 px-4 rounded-lg font-medium transition-colors text-white ${
                   action === 'withdraw'
                     ? 'bg-red-600 hover:bg-red-700 disabled:bg-red-400'
                     : 'bg-green-600 hover:bg-green-700 disabled:bg-green-400'
                 }`}
               >
-                {isProcessing ? (
+                {depositIsProcessing ? (
                   <div className="flex items-center justify-center space-x-2">
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                     <span>Processing...</span>

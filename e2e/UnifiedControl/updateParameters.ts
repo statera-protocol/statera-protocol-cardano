@@ -12,16 +12,6 @@ const collateral_assets = [
         assetObject.ada.policy,
         assetObject.ada.name,
     ]),
-    mConStr0([
-        mConStr1([]),
-        assetObject.iUSD.policy,
-        assetObject.iUSD.name,
-    ]),
-    mConStr0([
-        mConStr0([]),
-        assetObject.hosky.policy,
-        assetObject.hosky.name,
-    ]),
 ];
 
 const swappable_assets = [
@@ -29,6 +19,11 @@ const swappable_assets = [
         mConStr1([]),
         assetObject.USDM.policy,
         assetObject.USDM.name,
+    ]),
+    mConStr0([
+        mConStr1([]),
+        assetObject.iUSD.policy,
+        assetObject.iUSD.name,
     ]),
 ];
 

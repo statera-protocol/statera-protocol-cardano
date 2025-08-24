@@ -1,20 +1,30 @@
-import { ConStr0, deserializeDatum, mConStr0, mConStr1, mConStr3, serializeAddressObj, serializeNativeScript, stringToHex } from "@meshsdk/core";
-import { batchingScriptTxHash, batchingScriptTxIdx, blockchainProvider, StPoolNftName, StStableAssetName, txBuilder, wallet1, wallet1Address, wallet1Collateral, wallet1Utxos, wallet1VK, wallet2Address } from "../setup.js";
+import { deserializeDatum, mConStr0, mConStr1, mConStr3, serializeAddressObj } from "@meshsdk/core";
+import { assetObject, batchingScriptTxHash, batchingScriptTxIdx, blockchainProvider, StPoolNftName, StStableAssetName, txBuilder, wallet1, wallet1Address, wallet1Collateral, wallet1Utxos, wallet1VK } from "../setup.js";
 import { MintStPolicy, MintStValidatorScript, stUnit } from "../StMinting/validator.js";
-import { batchingAsset, BatchingRewardAddr, BatchingValidatorHash, BatchingValidatorScript, OrderValidatorAddr, OrderValidatorHash, OrderValidatorRewardAddr, OrderValidatorScript, PoolValidatorAddr, PoolValidatorHash, PoolValidatorScript } from "./validators.js";
+import { BatchingRewardAddr, BatchingValidatorHash, OrderValidatorAddr, OrderValidatorRewardAddr, OrderValidatorScript, PoolValidatorAddr, PoolValidatorHash, PoolValidatorScript } from "../Batching/validators.js";
 import { OrderDatumType } from "../types.js";
 import { getPParamsUtxo } from "../utils.js";
+
+// Change this to batch different assets
+const batchingAsset = assetObject.USDM;
+
+// Change this too to either true or false for the stablenesss
+const isStable = true;
+let batchingAssetStableness = undefined;
+if (isStable) {
+  batchingAssetStableness = mConStr1([]);
+} else {
+  batchingAssetStableness = mConStr0([]);
+}
 
 const pParamsUtxo = getPParamsUtxo();
 
 const correctOrderAsset =
     mConStr0([
-        mConStr1([]),
+        batchingAssetStableness,
         batchingAsset.policy,
         batchingAsset.name,
     ]);
-
-// const isks = JSON.stringify(correctOrderAsset);
 
 const AllOrderUtxos = await blockchainProvider.fetchAddressUTxOs(OrderValidatorAddr);
 // Only orders with the pool asset and with a valid datum are batched
@@ -26,7 +36,7 @@ const AllBatchingOrderUtxos = AllOrderUtxos.filter((utxo) => {
     const orderDatum = deserializeDatum<OrderDatumType>(datum);
     const orderAsset =
         mConStr0([
-            mConStr1([]),
+            batchingAssetStableness,
             orderDatum.fields[3].fields[1].bytes,
             orderDatum.fields[3].fields[2].bytes,
         ]);
@@ -49,12 +59,6 @@ if (!poolUtxo) throw new Error("The right pool utxo not found!");
 
 let stMinted = 0;
 let orderTxs = txBuilder
-// let orderTxs = txBuilder
-//     // order withdrawal (Process Order)
-//     .withdrawalPlutusScriptV3()
-//     .withdrawal(OrderValidatorRewardAddr, "0")
-//     .withdrawalScript(OrderValidatorScript)
-//     .withdrawalRedeemerValue(mConStr1([]))
 
 for (let i = 0; i < batchingOrderUtxos.length; i++) {
     const orderStAsset = batchingOrderUtxos[i].output.amount.find(ast => ast.unit == stUnit);
@@ -95,11 +99,7 @@ const PoolDatum = mConStr0([
 
 const PoolBatchingRedeemer = mConStr0([
     0,
-    mConStr0([
-        mConStr1([]),
-        batchingAsset.policy,
-        batchingAsset.name,
-    ]),
+    correctOrderAsset,
 ]);
 
 orderTxs = orderTxs
@@ -136,66 +136,44 @@ orderTxs = orderTxs
     ])
     .txOutInlineDatumValue(PoolDatum)
 
+for (let i = 0; i < batchingOrderUtxos.length; i++) {
+    const orderUtxo = batchingOrderUtxos[i];
+    const datum = orderUtxo.output.plutusData;
+    if (!datum) throw new Error("Order utxo must have a datum");
 
+    const orderDatum = deserializeDatum<OrderDatumType>(datum);
+    const orderAddress = serializeAddressObj(orderDatum.fields[1]);
 
-// for (let i = 0; i < batchingOrderUtxos.length; i++) {
-//     const orderUtxo = batchingOrderUtxos[i];
-//     const datum = orderUtxo.output.plutusData;
-//     if (!datum) throw new Error("Order utxo must have a datum");
+    const orderStAsset = batchingOrderUtxos[i].output.amount.find(ast => ast.unit == stUnit);
+    const orderAsset = batchingOrderUtxos[i].output.amount.find(ast => ast.unit == batchingAsset.unit);
 
-//     const orderDatum = deserializeDatum<OrderDatumType>(datum);
-//     const orderAddress = serializeAddressObj(orderDatum.fields[1]);
+    // filter out the asset to be exchanged from the order value
+    const orderUtxoChange = orderUtxo.output.amount.filter(ast => {
+        if (orderStAsset) {
+            return ast !== orderStAsset;
+        } else if (orderAsset) {
+            return ast !== orderAsset;
+        }
+        return true;
+    });
 
-//     const orderStAsset = batchingOrderUtxos[i].output.amount.find(ast => ast.unit == stUnit);
-//     const orderAsset = batchingOrderUtxos[i].output.amount.find(ast => ast.unit == batchingAsset.unit);
+    let orderResultAmount = undefined;
 
-//     // filter out the asset to be exchanged from the order value
-//     const orderUtxoChange = orderUtxo.output.amount.filter(ast => {
-//         if (orderStAsset) {
-//             return ast !== orderStAsset;
-//         } else if (orderAsset) {
-//             return ast !== orderAsset;
-//         }
-//         return true;
-//     });
+    if (orderStAsset) {
+        orderResultAmount = { unit: batchingAsset.unit, quantity: orderStAsset.quantity }
+    } else if (orderAsset) {
+        orderResultAmount = { unit: (MintStPolicy + StStableAssetName), quantity: orderAsset.quantity }
+    }
 
-//     let orderResultAmount = undefined;
+    if (!orderResultAmount) throw new Error("No result for order!");
 
-//     if (orderStAsset) {
-//         orderResultAmount = { unit: batchingAsset.unit, quantity: orderStAsset.quantity }
-//     } else if (orderAsset) {
-//         orderResultAmount = { unit: batchingAsset.unit, quantity: orderAsset.quantity }
-//     }
-
-//     if (!orderResultAmount) throw new Error("No result for order!");
-
-//     orderTxs = orderTxs
-//         .txOut(orderAddress, [
-//         // batchingOrderUtxos[i].output.amount[0], poolUtxo.output.amount[0],
-//         ...orderUtxoChange,
-//         orderResultAmount,
-//     ])
-// }
-
-orderTxs = orderTxs
-    // order output 0
-    .txOut(wallet1Address, [
-        // batchingOrderUtxos[0].output.amount[0],
-        batchingOrderUtxos[0].output.amount[0], poolUtxo.output.amount[0],
-        { unit: batchingAsset.unit, quantity: String(7000000) }
+    orderTxs = orderTxs
+        .txOut(orderAddress, [
+        // batchingOrderUtxos[i].output.amount[0], poolUtxo.output.amount[0],
+        ...orderUtxoChange,
+        orderResultAmount,
     ])
-    // order output 1
-    .txOut(wallet1Address, [
-        // batchingOrderUtxos[1].output.amount[0],
-        batchingOrderUtxos[1].output.amount[0], poolUtxo.output.amount[0],
-        { unit: stUnit, quantity: String(15000000) }
-    ])
-    // order output 2
-    .txOut(wallet1Address, [
-        // batchingOrderUtxos[2].output.amount[0],
-        batchingOrderUtxos[2].output.amount[0], poolUtxo.output.amount[0],
-        { unit: stUnit, quantity: String(15000000) }
-    ])
+}
 
 const unsignedTx = await orderTxs
     // protocol parameters reference input
