@@ -36,6 +36,8 @@ import { repayLoan } from '../../utils/LoanNFT/repayLoan';
 import { createBuyOrder } from '../../utils/Batching/createBuyOrder';
 import { createSellOrder } from '../../utils/Batching/createSellOrder';
 import { cancelOrder } from '../../utils/Batching/cancelOrder';
+import { toast, ToastContainer } from 'react-toastify';
+import "react-toastify/dist/ReactToastify.css";
 
 function Home() {
   const {
@@ -248,6 +250,23 @@ function Home() {
     setActiveTab('dashboard');
   };
 
+  // Toast
+  const toastSuccess = (txHash: string) => {
+    toast.success(<div>
+      Success!  
+      <br />
+      <a
+        href={`https://preprod.cardanoscan.io/transaction/${txHash}`} 
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{ color: "#61dafb", textDecoration: "underline" }}
+      >
+        View on Explorer
+      </a>
+    </div>);
+  };
+  const toastFailure = (err: any) => toast.error(`Failed: ${err instanceof Error ? err.message : String(err)}`);
+
   // handle new deposit
   const handleNewDeposit = async (amount: number) => {
     setIsProcessing({ bool: true, action: 'deposit', });
@@ -270,12 +289,14 @@ function Home() {
     } catch (err) {
       txBuilder.reset();
       setIsProcessing({ bool: false, action: 'deposit', });
+      toastFailure(err);
       console.log("handleNewDeposit error:", err);
       return;
     }
 
     blockchainProvider.onTxConfirmed(txHash, () => {
       setIsProcessing({ bool: false, action: 'deposit', });
+      toastSuccess(txHash);
       console.log("New balance txHash:", txHash);
     });
   };
@@ -302,12 +323,14 @@ function Home() {
     } catch (err) {
       txBuilder.reset();
       setIsProcessing({ bool: false, action: 'deposit', });
+      toastFailure(err);
       console.log("handleIncreaseDeposit error:", err);
       return;
     }
 
     blockchainProvider.onTxConfirmed(txHash, () => {
       setIsProcessing({ bool: false, action: 'deposit', });
+      toastSuccess(txHash);
       console.log("Increase balance txHash:", txHash);
     });
   };
@@ -334,12 +357,14 @@ function Home() {
     } catch (err) {
       txBuilder.reset();
       setIsProcessing({ bool: false, action: 'deposit', });
+      toastFailure(err);
       console.log("handleWithdrawDeposit error:", err);
       return;
     }
 
     blockchainProvider.onTxConfirmed(txHash, () => {
       setIsProcessing({ bool: false, action: 'deposit', });
+      toastSuccess(txHash);
       console.log("Reduce balance txHash:", txHash);
     });
   };
@@ -386,12 +411,14 @@ function Home() {
     } catch (err) {
       txBuilder.reset();
       setIsProcessing({ bool: false, action: 'deposit', });
+      toastFailure(err);
       console.log("handleCloseAccount error:", err);
       return;
     }
 
     blockchainProvider.onTxConfirmed(txHash, () => {
       setIsProcessing({ bool: false, action: 'deposit', });
+      toastSuccess(txHash);
       console.log("Withdraw all balance txHash:", txHash);
     });
   };
@@ -422,12 +449,14 @@ function Home() {
     } catch (err) {
       txBuilder.reset();
       setIsProcessing({ bool: false, action: 'loan', });
+      toastFailure(err);
       console.log("handleCreateLoan error:", err);
       return;
     }
 
     blockchainProvider.onTxConfirmed(txHash, () => {
       setIsProcessing({ bool: false, action: 'loan', });
+      toastSuccess(txHash);
       console.log('Take loan txHash:', txHash);
     });
 
@@ -536,12 +565,14 @@ function Home() {
     } catch (err) {
       txBuilder.reset();
       setIsProcessing({ bool: false, action: 'loan', });
+      toastFailure(err);
       console.log("handleIncreaseCollateral error:", err);
       return;
     }
 
     blockchainProvider.onTxConfirmed(txHash, () => {
       setIsProcessing({ bool: false, action: 'loan', });
+      toastSuccess(txHash);
       console.log("Increase collateral txHash:", txHash);
     });
   };
@@ -571,12 +602,14 @@ function Home() {
     } catch (err) {
       txBuilder.reset();
       setIsProcessing({ bool: false, action: 'loan', });
+      toastFailure(err);
       console.log("handleReduceCollateral error:", err);
       return;
     }
 
     blockchainProvider.onTxConfirmed(txHash, () => {
       setIsProcessing({ bool: false, action: 'loan', });
+      toastSuccess(txHash);
       console.log("Reduce collateral txHash:", txHash);
     });
   };
@@ -605,12 +638,14 @@ function Home() {
     } catch (err) {
       txBuilder.reset();
       setIsProcessing({ bool: false, action: 'loan', });
+      toastFailure(err);
       console.log("handlePartialRepayLoan error:", err);
       return;
     }
 
     blockchainProvider.onTxConfirmed(txHash, () => {
       setIsProcessing({ bool: false, action: 'loan', });
+      toastSuccess(txHash);
       console.log("Partial repay loan txHash:", txHash);
     });
   };
@@ -644,12 +679,14 @@ function Home() {
     } catch (err) {
       txBuilder.reset();
       setIsProcessing({ bool: false, action: 'loan', });
+      toastFailure(err);
       console.log("handleFullRepayLoan error:", err);
       return;
     }
 
     blockchainProvider.onTxConfirmed(txHash, () => {
       setIsProcessing({ bool: false, action: 'loan', });
+      toastSuccess(txHash);
       console.log('Full Repayment tx hash:', txHash);
     });
   };
@@ -782,12 +819,14 @@ function Home() {
     } catch (err) {
       txBuilder.reset();
       setIsProcessing({ bool: false, action: 'swap', });
-      console.log("Create buy order:", txHash);
+      toastFailure(err);
+      console.log("handleBuySwap error:", err);
       return;
     }
 
     blockchainProvider.onTxConfirmed(txHash, () => {
       setIsProcessing({ bool: false, action: 'swap', });
+      toastSuccess(txHash);
       console.log("Create buy order:", txHash);
     });
   }
@@ -814,12 +853,14 @@ function Home() {
     } catch (err) {
       txBuilder.reset();
       setIsProcessing({ bool: false, action: 'swap', });
-      console.log("Create sell order:", txHash);
+      toastFailure(err);
+      console.log("handleSellSwap error:", txHash);
       return;
     }
 
     blockchainProvider.onTxConfirmed(txHash, () => {
       setIsProcessing({ bool: false, action: 'swap', });
+      toastSuccess(txHash);
       console.log("Create sell order:", txHash);
     });
   }
@@ -847,12 +888,14 @@ function Home() {
     } catch (err) {
       txBuilder.reset();
       setIsProcessing({ bool: false, action: 'swap', });
-      console.log("Cancel order:", txHash);
+      toastFailure(err);
+      console.log("handleCancelSwap error:", txHash);
       return;
     }
 
     blockchainProvider.onTxConfirmed(txHash, () => {
       setIsProcessing({ bool: false, action: 'swap', });
+      toastSuccess(txHash);
       console.log("Cancel order:", txHash);
     });
 
@@ -933,6 +976,9 @@ function Home() {
 
   return (
     <div className="min-h-screen bg-gray-900 flex">
+      {/* Toast */}
+      <ToastContainer position='top-right' autoClose={5000} />
+
       {/* Sidebar */}
       <Sidebar
         activeTab={activeTab}
