@@ -71,7 +71,7 @@ const wallet2 = new MeshWallet({
     },
 });
 // Needs to be changed below to wallet 2 address;
-const wallet2Address = await wallet1.getChangeAddress();
+const wallet2Address = await wallet2.getChangeAddress();
 const { pubKeyHash: wallet2VK, stakeCredentialHash: wallet2SK } = deserializeAddress(wallet2Address);
 
 // Setup multisig

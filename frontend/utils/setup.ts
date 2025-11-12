@@ -60,7 +60,7 @@ export const setup = () => {
 
   // Setup MultiSig
   const wallet1VK = "96cbb27c96daf8cab890de6d7f87f5ffd025bf8ac80717cbc4fae7da";
-  const wallet2VK = "96cbb27c96daf8cab890de6d7f87f5ffd025bf8ac80717cbc4fae7da";
+  const wallet2VK = "331da30f7c8fea429e2bdc161efde817cbb06f78a53ef5ceee42c9a3";
 
   const nativeScript: NativeScript = {
     type: "all",
