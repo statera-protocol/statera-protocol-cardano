@@ -1,9 +1,9 @@
-# Halalend Protocol V1.1 Specification
+# Statera Protocol V1.1 Specification
 
 
 ## 1. Overview
 
-Halalend lending protocol mimics all the features of the currently existing lending protocols on
+Statera lending protocol mimics all the features of the currently existing lending protocols on
 Cardano except the interest paid by borrowers on loan repayment, and the fact that the protocol's
 own stable coin is going to use to issue loans. Loans are repaid at zero
 interest rate.
